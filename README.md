@@ -41,6 +41,12 @@ Move-Item cws.exe C:\Windows\System32\
 go install github.com/null3000/cws-cli/cmd/cws@latest
 ```
 
+Make sure `$GOPATH/bin` is in your `PATH`. If `cws` isn't found after installing, add this to your shell profile (`~/.zshrc`, `~/.bashrc`, etc.):
+
+```bash
+export PATH="$PATH:$(go env GOPATH)/bin"
+```
+
 ## Prerequisites
 
 Before using this CLI, you need to set up API access in the Google Cloud Console. Follow the official guide:
