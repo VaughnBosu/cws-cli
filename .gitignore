@@ -1,0 +1,22 @@
+# Binary
+cws
+
+# Config (contains secrets)
+cws.toml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out

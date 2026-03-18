@@ -1,0 +1,19 @@
+# CWS CLI Configuration
+#
+# Global config (auth): ~/.config/cws/cws.toml
+# Per-project config:   ./cws.toml
+#
+# All values can be overridden with environment variables:
+#   CWS_CLIENT_ID, CWS_CLIENT_SECRET, CWS_REFRESH_TOKEN,
+#   CWS_PUBLISHER_ID, CWS_EXTENSION_ID
+
+publisher_id = "abc1234567890"
+
+[auth]
+client_id = "xxxxxxxxxxxx.apps.googleusercontent.com"
+client_secret = "GOCSPX-xxxxxxxxxxxx"
+refresh_token = "1//xxxxxxxxxxxx"
+
+[extensions.default]
+id = "abcdefghijklmnopabcdefghijklmnop"
+source = "./dist"
