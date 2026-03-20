@@ -1,9 +1,9 @@
-name: Deploy install script to GitHub Pages
+name: Deploy docs to GitHub Pages
 
 on:
   push:
     branches: [main]
-    paths: [install.sh]
+    paths: [install.sh, docs/**]
   workflow_dispatch:
 
 permissions:
@@ -23,9 +23,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Stage install script
+      - name: Stage site
         run: |
           mkdir _site
+          cp -r docs/* _site/
           cp install.sh _site/
 
       - uses: actions/upload-pages-artifact@v3
