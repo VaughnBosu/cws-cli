@@ -4,6 +4,12 @@ A command-line tool for managing Chrome Web Store extensions using the [V2 API](
 
 ## Installation
 
+### Quick Install (macOS & Linux)
+
+```bash
+curl -fsSL https://null3000.github.io/cws-cli/install.sh | bash
+```
+
 ### From GitHub Releases
 
 Download the latest binary for your platform from [Releases](https://github.com/null3000/cws-cli/releases).
