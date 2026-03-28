@@ -5,10 +5,10 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/VaughnBosu/cws-cli/internal/api"
-	"github.com/VaughnBosu/cws-cli/internal/auth"
-	"github.com/VaughnBosu/cws-cli/internal/config"
-	"github.com/VaughnBosu/cws-cli/internal/output"
+	"github.com/vaughnbosu/cws-cli/internal/api"
+	"github.com/vaughnbosu/cws-cli/internal/auth"
+	"github.com/vaughnbosu/cws-cli/internal/config"
+	"github.com/vaughnbosu/cws-cli/internal/output"
 )
 
 var statusCmd = &cobra.Command{

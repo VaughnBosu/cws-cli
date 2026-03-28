@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/VaughnBosu/cws-cli/internal/api"
+	"github.com/vaughnbosu/cws-cli/internal/api"
 )
 
 // --- CWSError formatting tests ---

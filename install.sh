@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-REPO="VaughnBosu/cws-cli"
+REPO="vaughnbosu/cws-cli"
 BINARY="cws"
 BASE_URL="https://github.com/${REPO}/releases/latest/download"
 
@@ -111,8 +111,8 @@ install_binary() {
     if [ ! -w "$dir" ]; then
         printf "Error: %s is not writable\n" "$dir" >&2
         printf "Re-run with sudo or set CWS_INSTALL_DIR to a writable directory:\n" >&2
-        printf "  sudo sh -c 'curl -fsSL https://VaughnBosu.github.io/cws-cli/install.sh | sh'\n" >&2
-        printf "  CWS_INSTALL_DIR=~/.local/bin curl -fsSL https://VaughnBosu.github.io/cws-cli/install.sh | sh\n" >&2
+        printf "  sudo sh -c 'curl -fsSL https://vaughnbosu.github.io/cws-cli/install.sh | sh'\n" >&2
+        printf "  CWS_INSTALL_DIR=~/.local/bin curl -fsSL https://vaughnbosu.github.io/cws-cli/install.sh | sh\n" >&2
         exit 1
     fi
 

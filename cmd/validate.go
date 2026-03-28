@@ -8,12 +8,12 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/VaughnBosu/cws-cli/internal/api"
-	"github.com/VaughnBosu/cws-cli/internal/auth"
-	"github.com/VaughnBosu/cws-cli/internal/config"
-	"github.com/VaughnBosu/cws-cli/internal/manifest"
-	"github.com/VaughnBosu/cws-cli/internal/output"
-	cwszip "github.com/VaughnBosu/cws-cli/internal/zip"
+	"github.com/vaughnbosu/cws-cli/internal/api"
+	"github.com/vaughnbosu/cws-cli/internal/auth"
+	"github.com/vaughnbosu/cws-cli/internal/config"
+	"github.com/vaughnbosu/cws-cli/internal/manifest"
+	"github.com/vaughnbosu/cws-cli/internal/output"
+	cwszip "github.com/vaughnbosu/cws-cli/internal/zip"
 )
 
 const maxPackageSize = 512 * 1024 * 1024 // 512 MB

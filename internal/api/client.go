@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/VaughnBosu/cws-cli/internal/auth"
+	"github.com/vaughnbosu/cws-cli/internal/auth"
 )
 
 const defaultBaseURL = "https://chromewebstore.googleapis.com"
