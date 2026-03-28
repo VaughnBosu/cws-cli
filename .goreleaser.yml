@@ -13,7 +13,7 @@ builds:
       - amd64
       - arm64
     ldflags:
-      - -s -w -X github.com/null3000/cws-cli/cmd.Version={{.Version}}
+      - -s -w -X github.com/VaughnBosu/cws-cli/cmd.Version={{.Version}}
     main: .
 
 archives:
@@ -38,11 +38,11 @@ changelog:
 
 brews:
   - repository:
-      owner: null3000
+      owner: VaughnBosu
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
     directory: Formula
-    homepage: "https://null3000.github.io/cws-cli/"
+    homepage: "https://VaughnBosu.github.io/cws-cli/"
     description: "A CLI for managing Chrome Web Store extensions"
     license: "MIT"
     install: |
@@ -52,5 +52,5 @@ brews:
 
 release:
   github:
-    owner: null3000
+    owner: VaughnBosu
     name: cws-cli

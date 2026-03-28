@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/null3000/cws-cli/internal/manifest"
+	"github.com/VaughnBosu/cws-cli/internal/manifest"
 )
 
 // --- ValidateVersion tests ---

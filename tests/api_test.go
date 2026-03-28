@@ -9,7 +9,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/null3000/cws-cli/internal/api"
+	"github.com/VaughnBosu/cws-cli/internal/api"
 )
 
 // mockAuth implements auth.Authenticator for testing.

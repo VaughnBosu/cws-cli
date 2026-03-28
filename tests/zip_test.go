@@ -8,7 +8,7 @@ import (
 	"sort"
 	"testing"
 
-	cwszip "github.com/null3000/cws-cli/internal/zip"
+	cwszip "github.com/VaughnBosu/cws-cli/internal/zip"
 )
 
 func createFile(t *testing.T, path, content string) {

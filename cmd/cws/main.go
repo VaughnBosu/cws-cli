@@ -1,6 +1,6 @@
 package main
 
-import "github.com/null3000/cws-cli/cmd"
+import "github.com/VaughnBosu/cws-cli/cmd"
 
 func main() {
 	cmd.Execute()

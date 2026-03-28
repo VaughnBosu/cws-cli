@@ -1,4 +1,4 @@
-module github.com/null3000/cws-cli
+module github.com/VaughnBosu/cws-cli
 
 go 1.25.0
 

@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/null3000/cws-cli/internal/api"
-	"github.com/null3000/cws-cli/internal/auth"
-	"github.com/null3000/cws-cli/internal/config"
-	"github.com/null3000/cws-cli/internal/output"
-	cwszip "github.com/null3000/cws-cli/internal/zip"
+	"github.com/VaughnBosu/cws-cli/internal/api"
+	"github.com/VaughnBosu/cws-cli/internal/auth"
+	"github.com/VaughnBosu/cws-cli/internal/config"
+	"github.com/VaughnBosu/cws-cli/internal/output"
+	cwszip "github.com/VaughnBosu/cws-cli/internal/zip"
 )
 
 var uploadCmd = &cobra.Command{

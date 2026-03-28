@@ -2,24 +2,24 @@
 
 A single-binary CLI for managing Chrome Web Store extensions. Upload, publish, rollout, and more — from your terminal, powered by the latest V2 API.
 
-**[Documentation](https://null3000.github.io/cws-cli/)**
+**[Documentation](https://VaughnBosu.github.io/cws-cli/)**
 
 ## Install
 
 ```bash
-brew install null3000/tap/cws
+brew install VaughnBosu/tap/cws
 ```
 
 Or via script:
 
 ```bash
-curl -fsSL https://null3000.github.io/cws-cli/install.sh | bash
+curl -fsSL https://VaughnBosu.github.io/cws-cli/install.sh | bash
 ```
 
 Or from source:
 
 ```bash
-go install github.com/null3000/cws-cli/cmd/cws@latest
+go install github.com/VaughnBosu/cws-cli/cmd/cws@latest
 ```
 
 ## Quick Start

@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/null3000/cws-cli/internal/manifest"
-	cwszip "github.com/null3000/cws-cli/internal/zip"
+	"github.com/VaughnBosu/cws-cli/internal/manifest"
+	cwszip "github.com/VaughnBosu/cws-cli/internal/zip"
 )
 
 // --- End-to-end validation: good manifest ---

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/null3000/cws-cli/internal/config"
+	"github.com/VaughnBosu/cws-cli/internal/config"
 )
 
 // --- ResolveExtensionID tests ---

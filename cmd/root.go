@@ -5,8 +5,8 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/null3000/cws-cli/internal/api"
-	"github.com/null3000/cws-cli/internal/output"
+	"github.com/VaughnBosu/cws-cli/internal/api"
+	"github.com/VaughnBosu/cws-cli/internal/output"
 )
 
 var rootCmd = &cobra.Command{

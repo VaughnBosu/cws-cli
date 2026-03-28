@@ -3,7 +3,7 @@ package tests
 import (
 	"testing"
 
-	"github.com/null3000/cws-cli/cmd"
+	"github.com/VaughnBosu/cws-cli/cmd"
 )
 
 // --- FormatState tests ---
