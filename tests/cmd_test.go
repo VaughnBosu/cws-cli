@@ -15,9 +15,11 @@ func TestFormatState(t *testing.T) {
 	}{
 		{"PUBLISHED", "Published"},
 		{"PENDING_REVIEW", "Pending Review"},
-		{"DRAFT", "Draft"},
-		{"DEFERRED", "Staged (Deferred)"},
-		{"STATE_UNSPECIFIED", "Unknown"},
+		{"STAGED", "Staged"},
+		{"PUBLISHED_TO_TESTERS", "Published to Testers"},
+		{"REJECTED", "Rejected"},
+		{"CANCELLED", "Cancelled"},
+		{"ITEM_STATE_UNSPECIFIED", "Unknown"},
 		{"", ""},
 		{"SOME_NEW_STATE", "SOME_NEW_STATE"},
 	}

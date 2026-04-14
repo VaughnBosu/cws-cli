@@ -104,11 +104,15 @@ func FormatState(state string) string {
 		return "Published"
 	case "PENDING_REVIEW":
 		return "Pending Review"
-	case "DRAFT":
-		return "Draft"
-	case "DEFERRED":
-		return "Staged (Deferred)"
-	case "STATE_UNSPECIFIED":
+	case "STAGED":
+		return "Staged"
+	case "PUBLISHED_TO_TESTERS":
+		return "Published to Testers"
+	case "REJECTED":
+		return "Rejected"
+	case "CANCELLED":
+		return "Cancelled"
+	case "ITEM_STATE_UNSPECIFIED":
 		return "Unknown"
 	default:
 		return state

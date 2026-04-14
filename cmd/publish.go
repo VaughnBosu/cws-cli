@@ -57,7 +57,9 @@ func runPublish(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if len(resp.Status) > 0 {
+	if resp.State != "" {
+		output.Info("State: %s", FormatState(resp.State))
+	} else if len(resp.Status) > 0 {
 		output.Info("Status: %s", strings.Join(resp.Status, ", "))
 	} else {
 		output.Info("Publish submitted successfully.")

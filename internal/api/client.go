@@ -92,6 +92,7 @@ type ParsedAPIError struct {
 	Status      string   // status string (e.g., "INVALID_ARGUMENT")
 	Reasons     []string // reason codes from field violations (e.g., "PKG_INVALID_VERSION_NUMBER")
 	Description string   // most specific description found
+	Violations  []FieldViolation
 }
 
 // ParseAPIErrorDetail extracts structured error information from a Google API error response.
@@ -113,8 +114,11 @@ func ParseAPIErrorDetail(body []byte) *ParsedAPIError {
 			if v.Reason != "" {
 				parsed.Reasons = append(parsed.Reasons, v.Reason)
 			}
+			parsed.Violations = append(parsed.Violations, v)
 			if v.Description != "" {
-				parsed.Description = v.Description
+				if parsed.Description == "" {
+					parsed.Description = v.Description
+				}
 			}
 		}
 	}

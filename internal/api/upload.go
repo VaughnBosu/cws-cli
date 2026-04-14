@@ -26,19 +26,7 @@ func (c *Client) Upload(ctx context.Context, extensionID string, zipData []byte)
 		}
 		parsed := ParseAPIErrorDetail(respBody)
 		if parsed != nil {
-			// Use reason codes from field violations as item error codes for hint resolution
-			cwsErr := &CWSError{
-				Operation:  "upload",
-				HTTPStatus: statusCode,
-				Message:    parsed.Description,
-			}
-			if len(parsed.Reasons) > 0 {
-				cwsErr.Code = parsed.Reasons[0]
-				cwsErr.Hint = ResolveHint(parsed.Reasons[0], statusCode, parsed.Description)
-			} else {
-				cwsErr.Hint = ResolveHint("", statusCode, parsed.Description)
-			}
-			return &resp, cwsErr
+			return &resp, NewCWSErrorFromParsed("upload", statusCode, parsed, "")
 		}
 		return &resp, &CWSError{
 			Operation:  "upload",

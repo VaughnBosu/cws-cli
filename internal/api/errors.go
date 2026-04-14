@@ -64,14 +64,14 @@ var itemErrorHints = map[string]string{
 
 // publishStatusHints maps Chrome Web Store publish status codes to actionable hints.
 var publishStatusHints = map[string]string{
-	"NOT_AUTHORIZED":        "You don't have permission to publish this extension. Verify your OAuth credentials belong to the extension owner.",
-	"INVALID_DEVELOPER":     "The developer account is invalid. Verify your Chrome Web Store developer registration at https://chrome.google.com/webstore/devconsole",
+	"NOT_AUTHORIZED":         "You don't have permission to publish this extension. Verify your OAuth credentials belong to the extension owner.",
+	"INVALID_DEVELOPER":      "The developer account is invalid. Verify your Chrome Web Store developer registration at https://chrome.google.com/webstore/devconsole",
 	"DEVELOPER_NO_OWNERSHIP": "Your account does not own this extension. Verify the extension ID and publisher ID are correct.",
-	"DEVELOPER_SUSPENDED":   "Your developer account has been suspended. Check the Chrome Web Store developer dashboard for details.",
-	"ITEM_NOT_FOUND":        "The extension was not found. Verify the extension ID is correct.",
-	"ITEM_PENDING_REVIEW":   "The extension is already pending review. Wait for the review to complete, or use 'cws cancel' to cancel the pending submission first.",
-	"ITEM_TAKEN_DOWN":       "The extension has been taken down. Check the Chrome Web Store developer dashboard for details.",
-	"PUBLISHER_SUSPENDED":   "The publisher account has been suspended. Check the Chrome Web Store developer dashboard for details.",
+	"DEVELOPER_SUSPENDED":    "Your developer account has been suspended. Check the Chrome Web Store developer dashboard for details.",
+	"ITEM_NOT_FOUND":         "The extension was not found. Verify the extension ID is correct.",
+	"ITEM_PENDING_REVIEW":    "The extension is already pending review. Wait for the review to complete, or use 'cws cancel' to cancel the pending submission first.",
+	"ITEM_TAKEN_DOWN":        "The extension has been taken down. Check the Chrome Web Store developer dashboard for details.",
+	"PUBLISHER_SUSPENDED":    "The publisher account has been suspended. Check the Chrome Web Store developer dashboard for details.",
 }
 
 // httpStatusHints maps HTTP status codes to actionable hints.
@@ -103,10 +103,14 @@ func HintForMessage(msg string) string {
 	switch {
 	case strings.Contains(lower, "publish condition not met"):
 		return "The API did not provide a specific reason. Check the Chrome Web Store developer dashboard for details: https://chrome.google.com/webstore/devconsole"
+	case strings.Contains(lower, "permission justification"):
+		return "A newly requested permission is missing its Chrome Web Store justification. Add a justification for that permission in the developer dashboard, then publish again."
 	case strings.Contains(lower, "version number"):
 		return `Bump the "version" field in manifest.json to be higher than the currently published version.`
-	case strings.Contains(lower, "already in a pending"):
+	case strings.Contains(lower, "already in a pending"), strings.Contains(lower, "existing upload pending"), strings.Contains(lower, "upload pending"):
 		return "A previous version is still being reviewed. Wait for it to complete, or use 'cws cancel' to cancel it first."
+	case strings.Contains(lower, "must be larger than the existing target percentage"):
+		return "Rollout percentages can only increase. Check the current deploy percentage with 'cws status' before retrying."
 	default:
 		return ""
 	}
@@ -152,5 +156,51 @@ func NewCWSError(operation string, httpStatus int, itemErrors []ItemError, fallb
 		cwsErr.Hint = HintForHTTPStatus(httpStatus)
 	}
 
+	return cwsErr
+}
+
+// NewCWSErrorFromParsed creates a CWSError from a parsed Google API error body.
+func NewCWSErrorFromParsed(operation string, httpStatus int, parsed *ParsedAPIError, fallbackMsg string) *CWSError {
+	cwsErr := &CWSError{
+		Operation:  operation,
+		HTTPStatus: httpStatus,
+	}
+
+	if parsed != nil {
+		for _, violation := range parsed.Violations {
+			detail := violation.Description
+			if detail == "" {
+				detail = parsed.Message
+			}
+			cwsErr.Details = append(cwsErr.Details, ErrorDetail{
+				Code:   violation.Reason,
+				Detail: detail,
+				Hint:   ResolveHint(violation.Reason, httpStatus, detail),
+			})
+		}
+
+		if len(parsed.Violations) > 0 {
+			first := parsed.Violations[0]
+			cwsErr.Code = first.Reason
+			cwsErr.Message = first.Description
+			cwsErr.Hint = ResolveHint(first.Reason, httpStatus, first.Description)
+			return cwsErr
+		}
+
+		cwsErr.Code = parsed.Status
+		cwsErr.Message = parsed.Description
+		cwsErr.Hint = ResolveHint(parsed.Status, httpStatus, parsed.Description)
+		if cwsErr.Message != "" {
+			return cwsErr
+		}
+	}
+
+	if fallbackMsg != "" {
+		cwsErr.Message = fallbackMsg
+		cwsErr.Hint = ResolveHint("", httpStatus, fallbackMsg)
+		return cwsErr
+	}
+
+	cwsErr.Hint = HintForHTTPStatus(httpStatus)
 	return cwsErr
 }

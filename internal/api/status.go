@@ -35,13 +35,7 @@ func (c *Client) FetchStatus(ctx context.Context, extensionID string) (*StatusRe
 		}
 		parsed := ParseAPIErrorDetail(respBody)
 		if parsed != nil {
-			cwsErr := &CWSError{
-				Operation:  "status check",
-				HTTPStatus: statusCode,
-				Message:    parsed.Description,
-				Hint:       ResolveHint("", statusCode, parsed.Description),
-			}
-			return &resp, respBody, cwsErr
+			return &resp, respBody, NewCWSErrorFromParsed("status check", statusCode, parsed, "")
 		}
 		return &resp, respBody, &CWSError{
 			Operation:  "status check",

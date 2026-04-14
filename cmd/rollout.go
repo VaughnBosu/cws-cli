@@ -57,6 +57,32 @@ func runRollout(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	output.Info("Deploy percentage set to %d%%.", resp.DeployPercentage)
+	status, _, err := client.FetchStatus(ctx, extensionID)
+	if err == nil {
+		if current := publishedDeployPercentage(status); current >= 0 {
+			output.Info("Deploy percentage set to %d%%.", current)
+			return nil
+		}
+	}
+
+	if resp.DeployPercentage > 0 {
+		output.Info("Deploy percentage set to %d%%.", resp.DeployPercentage)
+		return nil
+	}
+
+	output.Info("Deploy percentage update accepted. Run 'cws status' to confirm the live value.")
 	return nil
+}
+
+func publishedDeployPercentage(status *api.StatusResponse) int {
+	if status == nil || status.PublishedItemRevisionStatus == nil {
+		return -1
+	}
+
+	channels := status.PublishedItemRevisionStatus.DistributionChannels
+	if len(channels) == 0 {
+		return -1
+	}
+
+	return channels[0].DeployPercentage
 }

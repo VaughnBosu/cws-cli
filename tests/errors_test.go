@@ -298,9 +298,12 @@ func TestParseAPIErrorDetail_MultipleViolations(t *testing.T) {
 	if parsed.Reasons[0] != "REASON_A" || parsed.Reasons[1] != "REASON_B" {
 		t.Errorf("Reasons = %v, want [REASON_A, REASON_B]", parsed.Reasons)
 	}
-	// Description should be the last violation's description
-	if parsed.Description != "second" {
-		t.Errorf("Description = %q, want 'second'", parsed.Description)
+	if len(parsed.Violations) != 2 {
+		t.Fatalf("expected 2 violations, got %d", len(parsed.Violations))
+	}
+	// Description should keep the first violation's description so the primary error is stable.
+	if parsed.Description != "first" {
+		t.Errorf("Description = %q, want 'first'", parsed.Description)
 	}
 }
 
@@ -339,7 +342,7 @@ func TestUpload_400_ItemError_WithHint(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(400)
 		json.NewEncoder(w).Encode(map[string]any{
-			"uploadState": "FAILURE",
+			"uploadState": "FAILED",
 			"itemError": []map[string]any{
 				{
 					"error_code":   "PKG_INVALID_VERSION_NUMBER",
@@ -372,7 +375,7 @@ func TestUpload_400_MultipleItemErrors(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(400)
 		json.NewEncoder(w).Encode(map[string]any{
-			"uploadState": "FAILURE",
+			"uploadState": "FAILED",
 			"itemError": []map[string]any{
 				{"error_code": "PKG_INVALID_VERSION_NUMBER", "error_detail": "Bad version"},
 				{"error_code": "PKG_MANIFEST_PARSE_ERROR", "error_detail": "Bad manifest"},
@@ -450,12 +453,15 @@ func TestPublish_VagueConditionNotMet(t *testing.T) {
 	}
 }
 
-func TestPublish_StatusCode_NotAuthorized(t *testing.T) {
+func TestPublish_PermissionDenied_APIError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(403)
 		json.NewEncoder(w).Encode(map[string]any{
-			"statusCode": "NOT_AUTHORIZED",
-			"status":     []string{"NOT_AUTHORIZED"},
+			"error": map[string]any{
+				"code":    403,
+				"message": "Permission denied",
+				"status":  "PERMISSION_DENIED",
+			},
 		})
 	}))
 	defer server.Close()
@@ -470,11 +476,11 @@ func TestPublish_StatusCode_NotAuthorized(t *testing.T) {
 	if !errors.As(err, &cwsErr) {
 		t.Fatalf("expected CWSError, got %T: %v", err, err)
 	}
-	if cwsErr.Code != "NOT_AUTHORIZED" {
-		t.Errorf("Code = %q, want NOT_AUTHORIZED", cwsErr.Code)
+	if cwsErr.Code != "PERMISSION_DENIED" {
+		t.Errorf("Code = %q, want PERMISSION_DENIED", cwsErr.Code)
 	}
 	if cwsErr.Hint == "" {
-		t.Error("expected non-empty hint for NOT_AUTHORIZED")
+		t.Error("expected non-empty hint for PERMISSION_DENIED")
 	}
 }
 

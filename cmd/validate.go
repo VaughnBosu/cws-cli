@@ -215,12 +215,12 @@ func runValidationChecks(cmd *cobra.Command, cfg *config.Config, source string, 
 		results = append(results, pass("No published version found (first upload)"))
 	}
 
-	// Check 7: No pending submission
-	if resp.SubmittedItemRevisionStatus != nil {
+	// Check 7: No pending review submission
+	if resp.SubmittedItemRevisionStatus != nil && resp.SubmittedItemRevisionStatus.State == "PENDING_REVIEW" {
 		state := FormatState(resp.SubmittedItemRevisionStatus.State)
 		results = append(results, fail("Pending submission exists (%s). Use 'cws cancel' first, or wait for review", state))
 	} else {
-		results = append(results, pass("No pending submission"))
+		results = append(results, pass("No pending review submission"))
 	}
 
 	return results

@@ -200,8 +200,8 @@ func TestUpload_Success(t *testing.T) {
 		}
 		w.WriteHeader(200)
 		json.NewEncoder(w).Encode(map[string]any{
-			"id":          "ext123",
-			"uploadState": "SUCCESS",
+			"itemId":      "ext123",
+			"uploadState": "SUCCEEDED",
 		})
 	}))
 	defer server.Close()
@@ -211,8 +211,8 @@ func TestUpload_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if resp.UploadState != "SUCCESS" {
-		t.Errorf("UploadState = %q, want %q", resp.UploadState, "SUCCESS")
+	if resp.UploadState != "SUCCEEDED" {
+		t.Errorf("UploadState = %q, want %q", resp.UploadState, "SUCCEEDED")
 	}
 }
 
@@ -265,7 +265,9 @@ func TestPublish_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 		json.NewEncoder(w).Encode(map[string]any{
-			"status": []string{"OK"},
+			"itemId": "ext123",
+			"name":   "publishers/test-publisher/items/ext123",
+			"state":  "PENDING_REVIEW",
 		})
 	}))
 	defer server.Close()
@@ -275,8 +277,8 @@ func TestPublish_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(resp.Status) != 1 || resp.Status[0] != "OK" {
-		t.Errorf("Status = %v, want [OK]", resp.Status)
+	if resp.State != "PENDING_REVIEW" {
+		t.Errorf("State = %q, want %q", resp.State, "PENDING_REVIEW")
 	}
 }
 
@@ -290,7 +292,9 @@ func TestPublish_Staged(t *testing.T) {
 		}
 		w.WriteHeader(200)
 		json.NewEncoder(w).Encode(map[string]any{
-			"status": []string{"OK"},
+			"itemId": "ext123",
+			"name":   "publishers/test-publisher/items/ext123",
+			"state":  "STAGED",
 		})
 	}))
 	defer server.Close()
@@ -335,9 +339,7 @@ func TestSetDeployPercentage_Success(t *testing.T) {
 			t.Errorf("DeployPercentage = %d, want 50", req.DeployPercentage)
 		}
 		w.WriteHeader(200)
-		json.NewEncoder(w).Encode(map[string]any{
-			"deployPercentage": 50,
-		})
+		json.NewEncoder(w).Encode(map[string]any{})
 	}))
 	defer server.Close()
 
@@ -346,8 +348,8 @@ func TestSetDeployPercentage_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if resp.DeployPercentage != 50 {
-		t.Errorf("DeployPercentage = %d, want 50", resp.DeployPercentage)
+	if resp.DeployPercentage != 0 {
+		t.Errorf("DeployPercentage = %d, want 0 for empty V2 response", resp.DeployPercentage)
 	}
 }
 
@@ -378,9 +380,7 @@ func TestSetDeployPercentage_Error(t *testing.T) {
 func TestCancelSubmission_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
-		json.NewEncoder(w).Encode(map[string]any{
-			"status": "OK",
-		})
+		json.NewEncoder(w).Encode(map[string]any{})
 	}))
 	defer server.Close()
 
@@ -389,8 +389,8 @@ func TestCancelSubmission_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if resp.Status != "OK" {
-		t.Errorf("Status = %q, want %q", resp.Status, "OK")
+	if resp.Status != "" {
+		t.Errorf("Status = %q, want empty status for empty V2 response", resp.Status)
 	}
 }
 

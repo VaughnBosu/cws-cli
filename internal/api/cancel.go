@@ -21,10 +21,10 @@ func (c *Client) CancelSubmission(ctx context.Context, extensionID string) (*Can
 	}
 
 	if statusCode < 200 || statusCode >= 300 {
-		msg := ParseAPIError(respBody)
-		if msg == "" {
-			msg = "no pending submission to cancel for this extension"
+		if parsed := ParseAPIErrorDetail(respBody); parsed != nil {
+			return &resp, NewCWSErrorFromParsed("cancel", statusCode, parsed, "")
 		}
+		msg := "no pending submission to cancel for this extension"
 		return &resp, &CWSError{
 			Operation:  "cancel",
 			HTTPStatus: statusCode,

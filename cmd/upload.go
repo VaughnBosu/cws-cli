@@ -104,32 +104,38 @@ func runUpload(cmd *cobra.Command, args []string) error {
 	output.Info("Upload state: %s", resp.UploadState)
 
 	// Wait for processing
-	if wait && resp.UploadState == "UPLOAD_IN_PROGRESS" {
+	if wait && api.IsUploadInProgress(resp.UploadState) {
 		resp, err = waitForUpload(ctx, client, extensionID, timeout)
 		if err != nil {
 			return err
 		}
 	}
 
-	if resp.UploadState == "FAILURE" {
+	if api.IsUploadFailed(resp.UploadState) {
 		return api.NewCWSError("upload", 0, resp.ItemError, "upload processing failed")
 	}
 
-	if resp.UploadState == "UPLOAD_IN_PROGRESS" {
+	if api.IsUploadInProgress(resp.UploadState) {
 		output.Info("Upload is still processing. Use 'cws status' to check progress.")
 		return nil
+	}
+
+	if resp.UploadState == api.UploadStateNotFound {
+		return fmt.Errorf("upload status could not be found. Retry 'cws status' or upload again")
 	}
 
 	output.Info("Upload successful!")
 
 	// Auto-publish
-	if publish && resp.UploadState == "SUCCESS" {
+	if publish && api.IsUploadSucceeded(resp.UploadState) {
 		output.Info("Publishing...")
 		pubResp, err := client.Publish(ctx, extensionID, false)
 		if err != nil {
 			return fmt.Errorf("upload succeeded but publish failed: %w", err)
 		}
-		if len(pubResp.Status) > 0 {
+		if pubResp.State != "" {
+			output.Info("Publish state: %s", FormatState(pubResp.State))
+		} else if len(pubResp.Status) > 0 {
 			output.Info("Publish status: %s", strings.Join(pubResp.Status, ", "))
 		}
 	}
@@ -203,19 +209,11 @@ func waitForUpload(ctx context.Context, client *api.Client, extensionID string, 
 			return nil, err
 		}
 
-		if status.LastAsyncUploadState != "IN_PROGRESS" {
+		if !api.IsUploadInProgress(status.LastAsyncUploadState) {
 			output.Progress("\n")
-			uploadState := status.LastAsyncUploadState
-			// Map V2 fetchStatus values to upload response values
-			switch uploadState {
-			case "SUCCEEDED":
-				uploadState = "SUCCESS"
-			case "FAILED":
-				uploadState = "FAILURE"
-			}
 			return &api.UploadResponse{
-				ID:          status.ItemID,
-				UploadState: uploadState,
+				ItemID:      status.ItemID,
+				UploadState: status.LastAsyncUploadState,
 				ItemError:   status.ItemError,
 			}, nil
 		}

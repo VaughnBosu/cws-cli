@@ -26,21 +26,23 @@ func (c *Client) SetDeployPercentage(ctx context.Context, extensionID string, pe
 	}
 
 	if statusCode < 200 || statusCode >= 300 {
-		cwsErr := &CWSError{
-			Operation:  "rollout",
-			HTTPStatus: statusCode,
-		}
-		if resp.Status != "" {
-			cwsErr.Message = resp.Status
-		} else if detail := ParseAPIError(respBody); detail != "" {
-			cwsErr.Message = detail
+		parsed := ParseAPIErrorDetail(respBody)
+		var cwsErr *CWSError
+		if parsed != nil {
+			cwsErr = NewCWSErrorFromParsed("rollout", statusCode, parsed, "")
+		} else {
+			cwsErr = &CWSError{
+				Operation:  "rollout",
+				HTTPStatus: statusCode,
+				Message:    truncateBody(respBody, 200),
+			}
 		}
 
 		// Add rollout-specific hint for the common "does not meet requirements" error
 		if strings.Contains(strings.ToLower(cwsErr.Message), "does not meet requirements") ||
 			strings.Contains(strings.ToLower(cwsErr.Message), "not eligible") {
 			cwsErr.Hint = "Partial rollouts require your extension to have at least 10,000 weekly active users."
-		} else {
+		} else if cwsErr.Hint == "" {
 			cwsErr.Hint = ResolveHint("", statusCode, cwsErr.Message)
 		}
 
