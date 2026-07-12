@@ -243,11 +243,13 @@
           </tr>
         </thead>
         <tbody class="divide-y divide-zinc-200 dark:divide-zinc-800">
-          <tr><td class="px-4 py-3 font-mono text-xs"><code>cws init</code></td><td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">Interactive credential setup wizard</td></tr>
-          <tr><td class="px-4 py-3 font-mono text-xs"><code>cws validate [source]</code></td><td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">Pre-flight validation (manifest, version, size)</td></tr>
+          <tr><td class="px-4 py-3 font-mono text-xs"><code>cws init</code></td><td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">Interactive credential setup wizard (browser sign-in)</td></tr>
+          <tr><td class="px-4 py-3 font-mono text-xs"><code>cws login</code></td><td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">Re-acquire a refresh token via browser sign-in</td></tr>
+          <tr><td class="px-4 py-3 font-mono text-xs"><code>cws validate [source]</code></td><td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">Pre-flight validation (manifest, version, icons, size, policy flags)</td></tr>
+          <tr><td class="px-4 py-3 font-mono text-xs"><code>cws pack [source]</code></td><td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">Zip an extension directory without uploading</td></tr>
           <tr><td class="px-4 py-3 font-mono text-xs"><code>cws upload [source]</code></td><td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">Validate, zip, and upload a package</td></tr>
           <tr><td class="px-4 py-3 font-mono text-xs"><code>cws publish</code></td><td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">Publish the latest uploaded version</td></tr>
-          <tr><td class="px-4 py-3 font-mono text-xs"><code>cws status</code></td><td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">Check extension status</td></tr>
+          <tr><td class="px-4 py-3 font-mono text-xs"><code>cws status</code></td><td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">Check extension status, policy warnings, and takedowns</td></tr>
           <tr><td class="px-4 py-3 font-mono text-xs"><code>cws rollout &lt;pct&gt;</code></td><td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">Set deploy percentage (10k+ users required)</td></tr>
           <tr><td class="px-4 py-3 font-mono text-xs"><code>cws cancel</code></td><td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">Cancel a pending submission</td></tr>
           <tr><td class="px-4 py-3 font-mono text-xs"><code>cws version</code></td><td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">Print CLI version</td></tr>
@@ -272,7 +274,7 @@ cws validate ./dist --local
 
 <span class="text-zinc-500"># Validate a pre-built zip</span>
 cws validate extension.zip</code></pre>
-          <p class="mt-3 text-xs text-zinc-500 dark:text-zinc-400">Checks: manifest.json validity, required fields, version format, package size, version &gt; published, no pending submission. Also runs automatically before every <code>cws upload</code>.</p>
+          <p class="mt-3 text-xs text-zinc-500 dark:text-zinc-400">Checks: manifest.json validity, required fields, version format, icon files, package size, version &gt; published <em>and</em> submitted revisions, no pending submission, and policy warnings/takedowns. Also runs automatically before every <code>cws upload</code>.</p>
         </div>
       </details>
 
@@ -312,7 +314,17 @@ cws upload ./dist --skip-validate</code></pre>
 cws publish
 
 <span class="text-zinc-500"># Stage for review without auto-publishing</span>
-cws publish --staged</code></pre>
+cws publish --staged
+
+<span class="text-zinc-500"># Attempt to skip review (only some changes are eligible)</span>
+cws publish --skip-review
+
+<span class="text-zinc-500"># Fail if the store reports validation warnings</span>
+cws publish --block-on-warnings
+
+<span class="text-zinc-500"># Publish with an initial partial rollout</span>
+cws publish --deploy-percentage 10</code></pre>
+          <p class="mt-3 text-xs text-zinc-500 dark:text-zinc-400">Non-blocking store warnings are printed after every publish.</p>
         </div>
       </details>
 
@@ -369,7 +381,7 @@ cws init
 
 <span class="text-zinc-500"># Save credentials globally (~/.config/cws/cws.toml)</span>
 cws init --global</code></pre>
-          <p class="mt-3 text-xs text-zinc-500 dark:text-zinc-400">Interactive wizard that guides you through configuring OAuth2 Client ID, Client Secret, Refresh Token, and Publisher ID. Validates credentials before saving.</p>
+          <p class="mt-3 text-xs text-zinc-500 dark:text-zinc-400">Interactive wizard that guides you through configuring OAuth2 Client ID, Client Secret, Refresh Token, and Publisher ID. Secrets are read without echoing, the refresh token can be acquired with a browser sign-in (no OAuth Playground needed), credentials are validated before saving, and <code>cws.toml</code> is added to <code>.gitignore</code> automatically. Use <code>cws login</code> later to refresh an expired token.</p>
         </div>
       </details>
 
@@ -462,10 +474,23 @@ source = "./dist"</code></pre>
     <h2 class="text-2xl sm:text-3xl font-bold text-center">CI/CD</h2>
     <p class="mt-3 text-center text-zinc-500 dark:text-zinc-400 mb-12">Drop the binary into any pipeline — zero dependencies.</p>
 
-    <h3 class="font-semibold mb-3">GitHub Actions</h3>
+    <h3 class="font-semibold mb-3">GitHub Action</h3>
     <div class="relative">
       <pre class="bg-zinc-900 dark:bg-zinc-800 text-zinc-100 rounded-lg p-4 text-sm font-mono overflow-x-auto"><code><span class="text-zinc-500"># .github/workflows/publish.yml</span>
-- name: Install cws
+- name: Upload and publish extension
+  uses: vaughnbosu/cws-cli@main
+  with:
+    args: upload ./dist --publish
+    client-id: ${{ secrets.CWS_CLIENT_ID }}
+    client-secret: ${{ secrets.CWS_CLIENT_SECRET }}
+    refresh-token: ${{ secrets.CWS_REFRESH_TOKEN }}
+    publisher-id: ${{ secrets.CWS_PUBLISHER_ID }}
+    extension-id: ${{ vars.EXTENSION_ID }}</code></pre>
+    </div>
+
+    <h3 class="font-semibold mb-3 mt-10">Any other CI</h3>
+    <div class="relative">
+      <pre class="bg-zinc-900 dark:bg-zinc-800 text-zinc-100 rounded-lg p-4 text-sm font-mono overflow-x-auto"><code>- name: Install cws
   run: curl -fsSL https://vaughnbosu.github.io/cws-cli/install.sh | bash
 
 - name: Upload and publish extension
@@ -474,7 +499,7 @@ source = "./dist"</code></pre>
     CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
     CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
     CWS_PUBLISHER_ID: ${{ secrets.CWS_PUBLISHER_ID }}
-  run: cws upload ./dist -e ${{ vars.EXTENSION_ID }} --publish</code></pre>
+  run: cws upload ./dist -e ${{ vars.EXTENSION_ID }} --publish --json</code></pre>
     </div>
   </section>
 
@@ -511,7 +536,7 @@ source = "./dist"</code></pre>
             </tr>
             <tr>
               <td class="px-4 py-3 font-semibold">Commands</td>
-              <td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">validate, upload, publish, status, rollout, cancel</td>
+              <td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">validate, pack, upload, publish, status, rollout, cancel, login</td>
               <td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">upload, publish</td>
             </tr>
             <tr>

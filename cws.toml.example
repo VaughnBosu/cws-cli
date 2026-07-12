@@ -3,7 +3,7 @@
 # Global config (auth): ~/.config/cws/cws.toml
 # Per-project config:   ./cws.toml
 #
-# All values can be overridden with environment variables:
+# All values can be overridden with environment variables (env vars win):
 #   CWS_CLIENT_ID, CWS_CLIENT_SECRET, CWS_REFRESH_TOKEN,
 #   CWS_PUBLISHER_ID, CWS_EXTENSION_ID
 
@@ -14,6 +14,19 @@ client_id = "xxxxxxxxxxxx.apps.googleusercontent.com"
 client_secret = "GOCSPX-xxxxxxxxxxxx"
 refresh_token = "1//xxxxxxxxxxxx"
 
+# The extension used when --ext is not given.
 [extensions.default]
 id = "abcdefghijklmnopabcdefghijklmnop"
 source = "./dist"
+
+# Additional extensions, selected with --ext <name> (e.g. cws upload --ext beta)
+# [extensions.beta]
+# id = "ponmlkjihgfedcbaponmlkjihgfedcba"
+# source = "./dist-beta"
+
+# Optional packaging controls for directory sources.
+# exclude adds path components or extensions to the default exclusion list;
+# include keeps files a default exclusion would otherwise drop.
+# [package]
+# exclude = ["docs", ".log"]
+# include = ["package.json"]

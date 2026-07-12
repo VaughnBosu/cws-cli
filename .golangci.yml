@@ -1,0 +1,20 @@
+version: "2"
+
+linters:
+  settings:
+    errcheck:
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+        - (io.Closer).Close
+        - (io.ReadCloser).Close
+        - (*os.File).Close
+        - (net.Listener).Close
+        - (*net/http.Server).Close
+  exclusions:
+    rules:
+      # Test helpers intentionally ignore errors on writes to in-memory buffers.
+      - path: tests/
+        linters:
+          - errcheck

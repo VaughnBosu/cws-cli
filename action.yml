@@ -1,0 +1,61 @@
+name: "cws — Chrome Web Store CLI"
+description: "Upload and publish Chrome extensions to the Chrome Web Store"
+branding:
+  icon: upload-cloud
+  color: blue
+
+inputs:
+  args:
+    description: "Arguments passed to cws (e.g. 'upload ./dist --publish')"
+    required: true
+  version:
+    description: "cws release version to install (e.g. v1.2.0); defaults to latest"
+    required: false
+    default: "latest"
+  client-id:
+    description: "OAuth2 client ID (sets CWS_CLIENT_ID)"
+    required: false
+  client-secret:
+    description: "OAuth2 client secret (sets CWS_CLIENT_SECRET)"
+    required: false
+  refresh-token:
+    description: "OAuth2 refresh token (sets CWS_REFRESH_TOKEN)"
+    required: false
+  publisher-id:
+    description: "Chrome Web Store publisher ID (sets CWS_PUBLISHER_ID)"
+    required: false
+  extension-id:
+    description: "Extension ID (sets CWS_EXTENSION_ID)"
+    required: false
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install cws
+      shell: bash
+      run: |
+        set -euo pipefail
+        VERSION="${{ inputs.version }}"
+        OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
+        ARCH="$(uname -m)"
+        case "$ARCH" in
+          x86_64) ARCH=amd64 ;;
+          aarch64|arm64) ARCH=arm64 ;;
+        esac
+        if [ "$VERSION" = "latest" ]; then
+          URL="https://github.com/vaughnbosu/cws-cli/releases/latest/download/cws_${OS}_${ARCH}.tar.gz"
+        else
+          URL="https://github.com/vaughnbosu/cws-cli/releases/download/${VERSION}/cws_${OS}_${ARCH}.tar.gz"
+        fi
+        curl -fsSL "$URL" | tar -xz -C /tmp cws
+        sudo install /tmp/cws /usr/local/bin/cws
+        cws version
+    - name: Run cws
+      shell: bash
+      env:
+        CWS_CLIENT_ID: ${{ inputs.client-id }}
+        CWS_CLIENT_SECRET: ${{ inputs.client-secret }}
+        CWS_REFRESH_TOKEN: ${{ inputs.refresh-token }}
+        CWS_PUBLISHER_ID: ${{ inputs.publisher-id }}
+        CWS_EXTENSION_ID: ${{ inputs.extension-id }}
+      run: cws ${{ inputs.args }}
