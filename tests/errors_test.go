@@ -439,7 +439,7 @@ func TestPublish_VagueConditionNotMet(t *testing.T) {
 	defer server.Close()
 
 	client := newTestClient(server.URL)
-	_, err := client.Publish(context.Background(), "ext123", false)
+	_, err := client.Publish(context.Background(), "ext123", api.PublishOptions{})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -467,7 +467,7 @@ func TestPublish_PermissionDenied_APIError(t *testing.T) {
 	defer server.Close()
 
 	client := newTestClient(server.URL)
-	_, err := client.Publish(context.Background(), "ext123", false)
+	_, err := client.Publish(context.Background(), "ext123", api.PublishOptions{})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -506,22 +506,21 @@ func TestFetchStatus_404_HasHint(t *testing.T) {
 	}
 }
 
-func TestNewCWSError_FromItemErrors(t *testing.T) {
-	itemErrors := []api.ItemError{
-		{ErrorCode: "PKG_INVALID_VERSION_NUMBER", ErrorDetail: "Bad version"},
+func TestNewOperationError_ResolvesHint(t *testing.T) {
+	cwsErr := api.NewOperationError("upload", 429, "slow down")
+	if cwsErr.Message != "slow down" {
+		t.Errorf("Message = %q, want 'slow down'", cwsErr.Message)
 	}
-	cwsErr := api.NewCWSError("upload", 400, itemErrors, "")
-	if cwsErr.Code != "PKG_INVALID_VERSION_NUMBER" {
-		t.Errorf("Code = %q, want PKG_INVALID_VERSION_NUMBER", cwsErr.Code)
-	}
-	if cwsErr.Hint == "" {
-		t.Error("expected non-empty hint")
+	if !strings.Contains(cwsErr.Hint, "Rate limited") {
+		t.Errorf("Hint = %q, want rate-limit hint for 429", cwsErr.Hint)
 	}
 }
 
-func TestNewCWSError_FallbackMessage(t *testing.T) {
-	cwsErr := api.NewCWSError("upload", 0, nil, "upload processing failed")
-	if cwsErr.Message != "upload processing failed" {
-		t.Errorf("Message = %q, want 'upload processing failed'", cwsErr.Message)
+// ResolveHint must consult the publish-status table too — v2 surfaces those
+// codes as error statuses/reasons rather than a dedicated statusCode field.
+func TestResolveHint_PublishStatusCode(t *testing.T) {
+	hint := api.ResolveHint("ITEM_PENDING_REVIEW", 400, "")
+	if !strings.Contains(hint, "cws cancel") {
+		t.Errorf("hint = %q, want mention of cws cancel for ITEM_PENDING_REVIEW", hint)
 	}
 }

@@ -8,23 +8,22 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/vaughnbosu/cws-cli/internal/api"
-	"github.com/vaughnbosu/cws-cli/internal/auth"
 	"github.com/vaughnbosu/cws-cli/internal/config"
 	"github.com/vaughnbosu/cws-cli/internal/manifest"
 	"github.com/vaughnbosu/cws-cli/internal/output"
 	cwszip "github.com/vaughnbosu/cws-cli/internal/zip"
 )
 
-const maxPackageSize = 512 * 1024 * 1024 // 512 MB
+const maxPackageSize = 2 * 1024 * 1024 * 1024 // 2 GB (Chrome Web Store limit)
 
 var validateCmd = &cobra.Command{
 	Use:   "validate [source]",
 	Short: "Run pre-flight checks before uploading",
 	Long: `Validate an extension package before uploading to the Chrome Web Store.
 
-Checks manifest.json structure, version format, package size, and optionally
-verifies the version is higher than the currently published version.
+Checks manifest.json structure, version format, icons, package size, and
+optionally verifies the version is higher than the published and any
+submitted (in-review or draft) version.
 
 Use --local to skip remote checks (no credentials needed).`,
 	Args: cobra.MaximumNArgs(1),
@@ -38,8 +37,8 @@ func init() {
 
 // ValidationResult tracks the outcome of a single check.
 type ValidationResult struct {
-	Passed  bool
-	Message string
+	Passed  bool   `json:"passed"`
+	Message string `json:"message"`
 }
 
 func runValidate(cmd *cobra.Command, args []string) error {
@@ -50,32 +49,37 @@ func runValidate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Resolve source
+	extName, _ := cmd.Flags().GetString("ext")
 	var source string
 	if len(args) > 0 {
 		source = args[0]
 	} else {
-		source = config.ResolveSource("", cfg)
+		source = config.ResolveSource("", extName, cfg)
 	}
 
-	results := runValidationChecks(cmd, cfg, source, localOnly)
+	results, _ := runValidationChecks(cmd, cfg, source, localOnly)
 	return printResults(results)
 }
 
-func runValidationChecks(cmd *cobra.Command, cfg *config.Config, source string, localOnly bool) []ValidationResult {
+// runValidationChecks runs all validation checks and returns the results along
+// with the zip built during validation (nil if none was built), so callers like
+// cws upload can reuse it instead of zipping twice.
+func runValidationChecks(cmd *cobra.Command, cfg *config.Config, source string, localOnly bool) ([]ValidationResult, []byte) {
 	var results []ValidationResult
+	var pkg config.PackageConfig
+	if cfg != nil {
+		pkg = cfg.Package
+	}
 
 	// Check 1: Source exists
 	absSource, err := filepath.Abs(source)
 	if err != nil {
-		results = append(results, fail("Source path: %s", err))
-		return results
+		return append(results, fail("Source path: %s", err)), nil
 	}
 
 	info, err := os.Stat(absSource)
 	if err != nil {
-		results = append(results, fail("Source not found: %s", source))
-		return results
+		return append(results, fail("Source not found: %s", source)), nil
 	}
 
 	// Check 2: Parse manifest.json
@@ -85,49 +89,46 @@ func runValidationChecks(cmd *cobra.Command, cfg *config.Config, source string, 
 	if info.IsDir() {
 		manifestPath := filepath.Join(absSource, "manifest.json")
 		if _, err := os.Stat(manifestPath); err != nil {
-			results = append(results, fail("manifest.json not found in %s", source))
-			return results
+			return append(results, fail("manifest.json not found in %s", source)), nil
 		}
 		results = append(results, pass("manifest.json found"))
 
 		m, err = manifest.Parse(manifestPath)
 		if err != nil {
-			results = append(results, fail("manifest.json: %s", err))
-			return results
+			return append(results, fail("manifest.json: %s", err)), nil
 		}
 		results = append(results, pass("manifest.json is valid JSON"))
 
-		// Zip for size check
-		zipData, err = cwszip.ZipDirectory(absSource)
+		// Zip for size check (reused by cws upload)
+		zipData, err = cwszip.ZipDirectoryWithOptions(absSource, zipOptions(pkg))
 		if err != nil {
-			results = append(results, fail("Failed to zip directory: %s", err))
-			return results
+			return append(results, fail("Failed to zip directory: %s", err)), nil
 		}
 	} else {
 		ext := strings.ToLower(filepath.Ext(absSource))
 		if ext != ".zip" && ext != ".crx" {
-			results = append(results, fail("Source must be a directory, .zip, or .crx file"))
-			return results
+			return append(results, fail("Source must be a directory, .zip, or .crx file")), nil
 		}
 
 		zipData, err = os.ReadFile(absSource)
 		if err != nil {
-			results = append(results, fail("Failed to read %s: %s", source, err))
-			return results
+			return append(results, fail("Failed to read %s: %s", source, err)), nil
 		}
 
-		if ext == ".zip" {
-			m, err = manifest.ParseFromZip(zipData)
+		if ext == ".crx" {
+			zipData, err = cwszip.ExtractZipFromCRX(zipData)
 			if err != nil {
-				results = append(results, fail("manifest.json: %s", err))
-				return results
+				return append(results, fail("CRX: %s", err)), nil
 			}
-			results = append(results, pass("manifest.json found"))
-			results = append(results, pass("manifest.json is valid JSON"))
-		} else {
-			// .crx files can't be easily parsed for manifest
-			results = append(results, pass("Source file exists (%s)", ext))
+			results = append(results, pass("CRX header unwrapped"))
 		}
+
+		m, err = manifest.ParseFromZip(zipData)
+		if err != nil {
+			return append(results, fail("manifest.json: %s", err)), nil
+		}
+		results = append(results, pass("manifest.json found"))
+		results = append(results, pass("manifest.json is valid JSON"))
 	}
 
 	// Check 3: Required fields
@@ -147,13 +148,23 @@ func runValidationChecks(cmd *cobra.Command, cfg *config.Config, source string, 
 				results = append(results, pass("Version format valid: %s", m.Version))
 			}
 		}
+
+		// Check 5: Icon files referenced by the manifest exist in the package
+		if len(m.Icons) > 0 {
+			missingIcons := missingIconFiles(m, info.IsDir(), absSource, zipData)
+			if len(missingIcons) > 0 {
+				results = append(results, fail("Missing icon files: %s", strings.Join(missingIcons, ", ")))
+			} else {
+				results = append(results, pass("Icon files present (%d)", len(m.Icons)))
+			}
+		}
 	}
 
-	// Check 5: Package size
+	// Check 6: Package size
 	if zipData != nil {
 		sizeMB := float64(len(zipData)) / (1024 * 1024)
 		if len(zipData) > maxPackageSize {
-			results = append(results, fail("Package too large: %.1f MB (max 512 MB)", sizeMB))
+			results = append(results, fail("Package too large: %.1f MB (max 2 GB)", sizeMB))
 		} else if sizeMB >= 1.0 {
 			results = append(results, pass("Package size OK (%.1f MB)", sizeMB))
 		} else {
@@ -164,58 +175,59 @@ func runValidationChecks(cmd *cobra.Command, cfg *config.Config, source string, 
 
 	// Remote checks
 	if localOnly || m == nil {
-		return results
+		return results, zipData
 	}
 
 	if cfg == nil {
-		results = append(results, fail("No configuration found (skipping remote checks)"))
-		return results
+		return append(results, fail("No configuration found (skipping remote checks)")), zipData
 	}
 	if err := config.ValidateAuth(cfg); err != nil {
-		results = append(results, fail("Auth not configured: %s (use --local to skip remote checks)", err))
-		return results
+		return append(results, fail("Auth not configured: %s (use --local to skip remote checks)", err)), zipData
 	}
 
-	extensionIDFlag, _ := cmd.Flags().GetString("extension-id")
-	extensionID, err := config.ResolveExtensionID(extensionIDFlag, cfg)
+	actx, err := newAPIContext(cmd)
 	if err != nil {
-		results = append(results, fail("Extension ID: %s", err))
-		return results
+		return append(results, fail("Extension ID: %s", err)), zipData
 	}
-
-	authenticator := auth.NewOAuthAuthenticator(cfg.Auth.ClientID, cfg.Auth.ClientSecret, cfg.Auth.RefreshToken)
-	client := api.NewClient(authenticator, cfg.PublisherID)
 	ctx := context.Background()
 
-	resp, _, err := client.FetchStatus(ctx, extensionID)
+	resp, _, err := actx.client.FetchStatus(ctx, actx.extensionID)
 	if err != nil {
-		results = append(results, fail("Failed to fetch status: %s", err))
-		return results
+		return append(results, fail("Failed to fetch status: %s", err)), zipData
 	}
 
-	// Check 6: Version higher than published
-	if resp.PublishedItemRevisionStatus != nil && m.Version != "" {
-		publishedVersion := resp.PublishedItemRevisionStatus.CrxVersion
-		if publishedVersion == "" && len(resp.PublishedItemRevisionStatus.DistributionChannels) > 0 {
-			publishedVersion = resp.PublishedItemRevisionStatus.DistributionChannels[0].CrxVersion
+	// Check 7: Version higher than published AND any submitted (draft/in-review) revision.
+	// The upload endpoint rejects versions not higher than the last uploaded revision,
+	// so comparing against the published version alone is not enough.
+	if m.Version != "" {
+		revisions := []struct {
+			label   string
+			version string
+		}{
+			{"published", resp.PublishedItemRevisionStatus.Version()},
+			{"submitted", resp.SubmittedItemRevisionStatus.Version()},
 		}
-		if publishedVersion != "" {
-			higher, err := manifest.CompareVersions(m.Version, publishedVersion)
+		checked := false
+		for _, rev := range revisions {
+			if rev.version == "" {
+				continue
+			}
+			checked = true
+			higher, err := manifest.CompareVersions(m.Version, rev.version)
 			if err != nil {
 				results = append(results, fail("Version comparison: %s", err))
 			} else if !higher {
-				results = append(results, fail("Version %s is not higher than published %s", m.Version, publishedVersion))
+				results = append(results, fail("Version %s is not higher than %s %s", m.Version, rev.label, rev.version))
 			} else {
-				results = append(results, pass("Version %s > published %s", m.Version, publishedVersion))
+				results = append(results, pass("Version %s > %s %s", m.Version, rev.label, rev.version))
 			}
-		} else {
+		}
+		if !checked {
 			results = append(results, pass("No published version found (first upload)"))
 		}
-	} else if resp.PublishedItemRevisionStatus == nil {
-		results = append(results, pass("No published version found (first upload)"))
 	}
 
-	// Check 7: No pending review submission
+	// Check 8: No pending review submission
 	if resp.SubmittedItemRevisionStatus != nil && resp.SubmittedItemRevisionStatus.State == "PENDING_REVIEW" {
 		state := FormatState(resp.SubmittedItemRevisionStatus.State)
 		results = append(results, fail("Pending submission exists (%s). Use 'cws cancel' first, or wait for review", state))
@@ -223,7 +235,34 @@ func runValidationChecks(cmd *cobra.Command, cfg *config.Config, source string, 
 		results = append(results, pass("No pending review submission"))
 	}
 
-	return results
+	// Check 9: Policy flags
+	if resp.TakenDown {
+		results = append(results, fail("Extension has been TAKEN DOWN for a policy violation. Check the developer dashboard"))
+	}
+	if resp.Warned {
+		results = append(results, fail("Extension has a policy WARNING and may be taken down if not resolved. Check the developer dashboard"))
+	}
+
+	return results, zipData
+}
+
+// missingIconFiles returns manifest icon paths that don't exist in the package.
+func missingIconFiles(m *manifest.Manifest, isDir bool, absSource string, zipData []byte) []string {
+	var missing []string
+	for _, iconPath := range m.Icons {
+		clean := strings.TrimPrefix(iconPath, "/")
+		if isDir {
+			if _, err := os.Stat(filepath.Join(absSource, filepath.FromSlash(clean))); err != nil {
+				missing = append(missing, iconPath)
+			}
+		} else if zipData != nil {
+			found, err := cwszip.ContainsFileInZip(zipData, clean)
+			if err != nil || !found {
+				missing = append(missing, iconPath)
+			}
+		}
+	}
+	return missing
 }
 
 func pass(format string, args ...any) ValidationResult {
@@ -245,7 +284,16 @@ func printResults(results []ValidationResult) error {
 		}
 	}
 
-	fmt.Println()
+	if output.JSONMode() {
+		_ = output.EmitJSON(map[string]any{
+			"passed":   failures == 0,
+			"failures": failures,
+			"checks":   results,
+		})
+	} else {
+		fmt.Println()
+	}
+
 	if failures > 0 {
 		return fmt.Errorf("validation failed: %d issue(s) found", failures)
 	}

@@ -89,6 +89,21 @@ func TestLiveDiscoveryContract(t *testing.T) {
 	if _, ok := publishSchema.Properties["state"]; !ok {
 		t.Fatal("PublishItemResponse.state missing from live discovery doc")
 	}
+	if _, ok := publishSchema.Properties["warningInfo"]; !ok {
+		t.Fatal("PublishItemResponse.warningInfo missing from live discovery doc")
+	}
+
+	statusSchema := doc.Schemas["FetchItemStatusResponse"]
+	for _, want := range []string{"warned", "takenDown", "lastAsyncUploadState", "publishedItemRevisionStatus", "submittedItemRevisionStatus"} {
+		if _, ok := statusSchema.Properties[want]; !ok {
+			t.Fatalf("FetchItemStatusResponse.%s missing from live discovery doc", want)
+		}
+	}
+	// The client intentionally has no itemError plumbing; fail loudly if the
+	// contract ever grows one so we can start surfacing it.
+	if _, ok := statusSchema.Properties["itemError"]; ok {
+		t.Fatal("FetchItemStatusResponse now has itemError — the client should surface it")
+	}
 
 	rolloutSchema := doc.Schemas["SetPublishedDeployPercentageResponse"]
 	if len(rolloutSchema.Properties) != 0 {

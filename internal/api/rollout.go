@@ -2,13 +2,12 @@ package api
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"strings"
 )
 
 // SetDeployPercentage sets the deploy percentage for a published extension.
-func (c *Client) SetDeployPercentage(ctx context.Context, extensionID string, percentage int) (*DeployPercentageResponse, error) {
+// The v2 response body is empty, so success is indicated by the error being nil.
+func (c *Client) SetDeployPercentage(ctx context.Context, extensionID string, percentage int) error {
 	path := c.itemPath(extensionID, "setPublishedDeployPercentage")
 
 	reqBody := &DeployPercentageRequest{
@@ -17,37 +16,19 @@ func (c *Client) SetDeployPercentage(ctx context.Context, extensionID string, pe
 
 	respBody, statusCode, err := c.doJSON(ctx, "POST", path, reqBody)
 	if err != nil {
-		return nil, err
-	}
-
-	var resp DeployPercentageResponse
-	if err := json.Unmarshal(respBody, &resp); err != nil {
-		return nil, fmt.Errorf("failed to parse rollout response (HTTP %d): %s", statusCode, truncateBody(respBody, 200))
+		return err
 	}
 
 	if statusCode < 200 || statusCode >= 300 {
-		parsed := ParseAPIErrorDetail(respBody)
-		var cwsErr *CWSError
-		if parsed != nil {
-			cwsErr = NewCWSErrorFromParsed("rollout", statusCode, parsed, "")
-		} else {
-			cwsErr = &CWSError{
-				Operation:  "rollout",
-				HTTPStatus: statusCode,
-				Message:    truncateBody(respBody, 200),
-			}
-		}
+		cwsErr := apiError("rollout", statusCode, respBody)
 
 		// Add rollout-specific hint for the common "does not meet requirements" error
-		if strings.Contains(strings.ToLower(cwsErr.Message), "does not meet requirements") ||
-			strings.Contains(strings.ToLower(cwsErr.Message), "not eligible") {
+		lower := strings.ToLower(cwsErr.Message)
+		if strings.Contains(lower, "does not meet requirements") || strings.Contains(lower, "not eligible") {
 			cwsErr.Hint = "Partial rollouts require your extension to have at least 10,000 weekly active users."
-		} else if cwsErr.Hint == "" {
-			cwsErr.Hint = ResolveHint("", statusCode, cwsErr.Message)
 		}
-
-		return &resp, cwsErr
+		return cwsErr
 	}
 
-	return &resp, nil
+	return nil
 }

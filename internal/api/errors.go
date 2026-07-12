@@ -81,7 +81,8 @@ var httpStatusHints = map[int]string{
 	429: "Rate limited by the Chrome Web Store API. Wait a few minutes and try again.",
 }
 
-// HintForItemError returns an actionable hint for a known ItemError error_code.
+// HintForItemError returns an actionable hint for a known package error code
+// (e.g. PKG_INVALID_VERSION_NUMBER), as surfaced in field-violation reasons.
 func HintForItemError(code string) string {
 	return itemErrorHints[code]
 }
@@ -117,8 +118,13 @@ func HintForMessage(msg string) string {
 }
 
 // ResolveHint tries all hint sources in priority order and returns the first match.
+// Codes are checked against both the package error and publish status tables,
+// since v2 surfaces both kinds as error reasons/statuses.
 func ResolveHint(errorCode string, httpStatus int, message string) string {
 	if h := HintForItemError(errorCode); h != "" {
+		return h
+	}
+	if h := HintForPublishStatus(errorCode); h != "" {
 		return h
 	}
 	if h := HintForHTTPStatus(httpStatus); h != "" {
@@ -130,33 +136,15 @@ func ResolveHint(errorCode string, httpStatus int, message string) string {
 	return ""
 }
 
-// NewCWSError creates a CWSError from an operation, HTTP status, and ItemError list.
-func NewCWSError(operation string, httpStatus int, itemErrors []ItemError, fallbackMsg string) *CWSError {
-	cwsErr := &CWSError{
+// NewOperationError creates a CWSError from an operation, HTTP status, and message,
+// resolving an actionable hint when one is known.
+func NewOperationError(operation string, httpStatus int, message string) *CWSError {
+	return &CWSError{
 		Operation:  operation,
 		HTTPStatus: httpStatus,
+		Message:    message,
+		Hint:       ResolveHint("", httpStatus, message),
 	}
-
-	if len(itemErrors) > 0 {
-		for _, ie := range itemErrors {
-			cwsErr.Details = append(cwsErr.Details, ErrorDetail{
-				Code:   ie.ErrorCode,
-				Detail: ie.ErrorDetail,
-				Hint:   HintForItemError(ie.ErrorCode),
-			})
-		}
-		// Use first error as the primary message/code/hint
-		cwsErr.Code = itemErrors[0].ErrorCode
-		cwsErr.Message = itemErrors[0].ErrorDetail
-		cwsErr.Hint = ResolveHint(itemErrors[0].ErrorCode, httpStatus, itemErrors[0].ErrorDetail)
-	} else if fallbackMsg != "" {
-		cwsErr.Message = fallbackMsg
-		cwsErr.Hint = ResolveHint("", httpStatus, fallbackMsg)
-	} else {
-		cwsErr.Hint = HintForHTTPStatus(httpStatus)
-	}
-
-	return cwsErr
 }
 
 // NewCWSErrorFromParsed creates a CWSError from a parsed Google API error body.

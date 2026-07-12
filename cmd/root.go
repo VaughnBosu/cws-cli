@@ -10,11 +10,15 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "cws",
-	Short: "Chrome Web Store CLI",
-	Long:  "A command-line tool for managing Chrome Web Store extensions using the V2 API.",
+	Use:           "cws",
+	Short:         "Chrome Web Store CLI",
+	Long:          "A command-line tool for managing Chrome Web Store extensions using the V2 API.",
 	SilenceUsage:  true,
 	SilenceErrors: true,
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		jsonOut, _ := cmd.Flags().GetBool("json")
+		output.SetJSONMode(jsonOut)
+	},
 }
 
 // Execute runs the root command.
@@ -31,4 +35,6 @@ func Execute() {
 
 func init() {
 	rootCmd.PersistentFlags().StringP("extension-id", "e", "", "Extension ID (overrides config)")
+	rootCmd.PersistentFlags().String("ext", "", `Named extension profile from cws.toml (default "default")`)
+	rootCmd.PersistentFlags().Bool("json", false, "Emit machine-readable JSON output")
 }

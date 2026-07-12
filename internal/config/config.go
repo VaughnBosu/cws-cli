@@ -10,9 +10,10 @@ import (
 
 // Config holds all configuration for the CLI.
 type Config struct {
-	PublisherID string           `mapstructure:"publisher_id" toml:"publisher_id"`
-	Auth        AuthConfig       `mapstructure:"auth" toml:"auth"`
-	Extensions  ExtensionsConfig `mapstructure:"extensions" toml:"extensions,omitempty"`
+	PublisherID string                     `mapstructure:"publisher_id" toml:"publisher_id"`
+	Auth        AuthConfig                 `mapstructure:"auth" toml:"auth"`
+	Extensions  map[string]ExtensionConfig `mapstructure:"extensions" toml:"extensions,omitempty"`
+	Package     PackageConfig              `mapstructure:"package" toml:"package,omitempty"`
 }
 
 // AuthConfig holds OAuth2 credentials.
@@ -22,15 +23,29 @@ type AuthConfig struct {
 	RefreshToken string `mapstructure:"refresh_token" toml:"refresh_token"`
 }
 
-// ExtensionsConfig holds extension configurations (designed for multi-extension M2 support).
-type ExtensionsConfig struct {
-	Default ExtensionConfig `mapstructure:"default" toml:"default,omitempty"`
-}
-
 // ExtensionConfig holds configuration for a single extension.
 type ExtensionConfig struct {
 	ID     string `mapstructure:"id" toml:"id,omitempty"`
 	Source string `mapstructure:"source" toml:"source,omitempty"`
+}
+
+// PackageConfig controls how directories are zipped.
+type PackageConfig struct {
+	// Exclude adds patterns (path components or extensions) to the default exclusion list.
+	Exclude []string `mapstructure:"exclude" toml:"exclude,omitempty"`
+	// Include keeps files that a default exclusion would otherwise drop (e.g. "package.json").
+	Include []string `mapstructure:"include" toml:"include,omitempty"`
+}
+
+// DefaultExtension is the extension profile used when --ext is not given.
+const DefaultExtension = "default"
+
+// Extension returns the named extension config, or a zero value if absent.
+func (c *Config) Extension(name string) ExtensionConfig {
+	if c == nil || c.Extensions == nil {
+		return ExtensionConfig{}
+	}
+	return c.Extensions[name]
 }
 
 // GlobalConfigDir returns the path to the global config directory.
@@ -56,7 +71,6 @@ func GlobalConfigPath() (string, error) {
 // Priority: env vars > local cws.toml > global cws.toml
 func Load() (*Config, error) {
 	v := viper.New()
-	v.SetConfigName("cws")
 	v.SetConfigType("toml")
 
 	// Environment variable bindings
@@ -68,24 +82,32 @@ func Load() (*Config, error) {
 	_ = v.BindEnv("publisher_id", "CWS_PUBLISHER_ID")
 	_ = v.BindEnv("extensions.default.id", "CWS_EXTENSION_ID")
 
+	// Config files are targeted by exact path. Viper's name-based search
+	// (SetConfigName) would also match a bare file named "cws" — such as a
+	// locally built binary — and try to parse it as TOML.
+
 	// Read global config first (lowest priority file)
-	globalDir := GlobalConfigDir()
-	if globalDir != "" {
-		v.AddConfigPath(globalDir)
+	if globalPath, err := GlobalConfigPath(); err == nil {
+		if _, err := os.Stat(globalPath); err == nil {
+			v.SetConfigFile(globalPath)
+			if err := v.ReadInConfig(); err != nil {
+				return nil, fmt.Errorf("failed to parse %s: %w", globalPath, err)
+			}
+		}
 	}
 
-	// Try to read global config
-	_ = v.ReadInConfig()
-
 	// Read local config (overrides global)
-	localV := viper.New()
-	localV.SetConfigName("cws")
-	localV.SetConfigType("toml")
-	localV.AddConfigPath(".")
-
-	if err := localV.ReadInConfig(); err == nil {
-		for _, key := range localV.AllKeys() {
-			v.Set(key, localV.Get(key))
+	if _, err := os.Stat("cws.toml"); err == nil {
+		localV := viper.New()
+		localV.SetConfigFile("cws.toml")
+		localV.SetConfigType("toml")
+		if err := localV.ReadInConfig(); err != nil {
+			return nil, fmt.Errorf("failed to parse ./cws.toml: %w", err)
+		}
+		// MergeConfigMap merges at config-file precedence, so env vars
+		// (bound above) still win over local file values.
+		if err := v.MergeConfigMap(localV.AllSettings()); err != nil {
+			return nil, fmt.Errorf("failed to merge local config: %w", err)
 		}
 	}
 
@@ -97,27 +119,38 @@ func Load() (*Config, error) {
 	return &cfg, nil
 }
 
-// ResolveExtensionID returns the extension ID from the flag override or config.
-func ResolveExtensionID(flagValue string, cfg *Config) (string, error) {
+// ResolveExtensionID returns the extension ID from the flag override, env, or the named profile.
+func ResolveExtensionID(flagValue, extName string, cfg *Config) (string, error) {
 	if flagValue != "" {
 		return flagValue, nil
 	}
-	if id := os.Getenv("CWS_EXTENSION_ID"); id != "" {
+	if extName == "" {
+		extName = DefaultExtension
+	}
+	if extName == DefaultExtension {
+		if id := os.Getenv("CWS_EXTENSION_ID"); id != "" {
+			return id, nil
+		}
+	}
+	if id := cfg.Extension(extName).ID; id != "" {
 		return id, nil
 	}
-	if cfg != nil && cfg.Extensions.Default.ID != "" {
-		return cfg.Extensions.Default.ID, nil
+	if extName != DefaultExtension {
+		return "", fmt.Errorf("no extension named %q in cws.toml. Add an [extensions.%s] section with an id", extName, extName)
 	}
 	return "", fmt.Errorf("no extension ID specified. Use --extension-id flag, set CWS_EXTENSION_ID, or add [extensions.default] to cws.toml")
 }
 
-// ResolveSource returns the source path from the flag override or config.
-func ResolveSource(argValue string, cfg *Config) string {
+// ResolveSource returns the source path from the flag override or the named profile.
+func ResolveSource(argValue, extName string, cfg *Config) string {
 	if argValue != "" {
 		return argValue
 	}
-	if cfg != nil && cfg.Extensions.Default.Source != "" {
-		return cfg.Extensions.Default.Source
+	if extName == "" {
+		extName = DefaultExtension
+	}
+	if src := cfg.Extension(extName).Source; src != "" {
+		return src
 	}
 	return "."
 }
@@ -147,6 +180,7 @@ func WriteConfig(path string, cfg *Config) error {
 	}
 
 	var content string
+	def := cfg.Extension(DefaultExtension)
 
 	// Check if this is a global config (has auth) or project config
 	if cfg.Auth.ClientID != "" {
@@ -163,19 +197,19 @@ refresh_token = %q
 			cfg.Auth.RefreshToken,
 		)
 
-		if cfg.Extensions.Default.ID != "" {
+		if def.ID != "" {
 			content += fmt.Sprintf(`
 [extensions.default]
 id = %q
-`, cfg.Extensions.Default.ID)
+`, def.ID)
 		}
 	} else {
 		content = fmt.Sprintf(`[extensions.default]
 id = %q
-`, cfg.Extensions.Default.ID)
-		if cfg.Extensions.Default.Source != "" {
+`, def.ID)
+		if def.Source != "" {
 			content += fmt.Sprintf(`source = %q
-`, cfg.Extensions.Default.Source)
+`, def.Source)
 		}
 	}
 

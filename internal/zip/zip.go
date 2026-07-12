@@ -36,9 +36,24 @@ var defaultExtExclusions = []string{
 	".map",
 }
 
+// Options controls zip packaging behavior.
+type Options struct {
+	// Exclude adds patterns (path components like "docs" or extensions like ".log")
+	// to the default exclusion list.
+	Exclude []string
+	// Include keeps files a default exclusion would otherwise drop (matched against
+	// path components and extensions, e.g. "package.json" or ".map").
+	Include []string
+}
+
 // ZipDirectory creates a zip archive from a directory, excluding default patterns.
-// Symlinks are skipped to prevent directory traversal.
+// Symlinks inside the tree are skipped to prevent directory traversal.
 func ZipDirectory(dir string) ([]byte, error) {
+	return ZipDirectoryWithOptions(dir, Options{})
+}
+
+// ZipDirectoryWithOptions is ZipDirectory with configurable exclusions.
+func ZipDirectoryWithOptions(dir string, opts Options) ([]byte, error) {
 	var buf bytes.Buffer
 	w := zip.NewWriter(&buf)
 
@@ -47,6 +62,14 @@ func ZipDirectory(dir string) ([]byte, error) {
 		return nil, fmt.Errorf("failed to resolve directory path: %w", err)
 	}
 
+	// Resolve a symlinked source directory (e.g. dist -> build/output) so the
+	// walk descends into the real tree instead of skipping the root symlink.
+	absDir, err = filepath.EvalSymlinks(absDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve directory path: %w", err)
+	}
+
+	fileCount := 0
 	err = filepath.WalkDir(absDir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -68,7 +91,7 @@ func ZipDirectory(dir string) ([]byte, error) {
 		}
 
 		// Check exclusions
-		if ShouldExclude(relPath, d.IsDir()) {
+		if ShouldExcludeWithOptions(relPath, d.IsDir(), opts) {
 			if d.IsDir() {
 				return filepath.SkipDir
 			}
@@ -78,6 +101,7 @@ func ZipDirectory(dir string) ([]byte, error) {
 		if d.IsDir() {
 			return nil
 		}
+		fileCount++
 
 		info, err := d.Info()
 		if err != nil {
@@ -117,6 +141,10 @@ func ZipDirectory(dir string) ([]byte, error) {
 		return nil, fmt.Errorf("failed to finalize zip: %w", err)
 	}
 
+	if fileCount == 0 {
+		return nil, fmt.Errorf("no files to package in %s (everything was excluded or the directory is empty)", dir)
+	}
+
 	return buf.Bytes(), nil
 }
 
@@ -128,13 +156,19 @@ func ContainsManifest(dir string) bool {
 
 // ContainsManifestInZip checks if a zip archive contains a manifest.json file.
 func ContainsManifestInZip(data []byte) (bool, error) {
+	return ContainsFileInZip(data, "manifest.json")
+}
+
+// ContainsFileInZip checks if a zip archive contains the named file (root-relative,
+// forward-slash path).
+func ContainsFileInZip(data []byte, name string) (bool, error) {
 	reader, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil {
 		return false, fmt.Errorf("failed to read zip file: %w", err)
 	}
 
 	for _, f := range reader.File {
-		if f.Name == "manifest.json" {
+		if f.Name == name {
 			return true, nil
 		}
 	}
@@ -143,9 +177,35 @@ func ContainsManifestInZip(data []byte) (bool, error) {
 
 // ShouldExclude checks if a file or directory should be excluded from the zip.
 func ShouldExclude(relPath string, isDir bool) bool {
-	parts := strings.Split(filepath.ToSlash(relPath), "/")
+	return ShouldExcludeWithOptions(relPath, isDir, Options{})
+}
 
-	for _, excl := range defaultExclusions {
+// ShouldExcludeWithOptions is ShouldExclude with configurable exclusions.
+// Include entries win over both default and configured exclusions.
+func ShouldExcludeWithOptions(relPath string, isDir bool, opts Options) bool {
+	parts := strings.Split(filepath.ToSlash(relPath), "/")
+	base := filepath.Base(relPath)
+	ext := filepath.Ext(base)
+
+	matches := func(pattern string) bool {
+		if !isDir && strings.HasPrefix(pattern, ".") && pattern == ext {
+			return true
+		}
+		for _, part := range parts {
+			if part == pattern {
+				return true
+			}
+		}
+		return false
+	}
+
+	for _, inc := range opts.Include {
+		if matches(inc) {
+			return false
+		}
+	}
+
+	for _, excl := range append(defaultExclusions, opts.Exclude...) {
 		for _, part := range parts {
 			if part == excl {
 				return true
@@ -154,8 +214,7 @@ func ShouldExclude(relPath string, isDir bool) bool {
 	}
 
 	if !isDir {
-		ext := filepath.Ext(filepath.Base(relPath))
-		for _, exclExt := range defaultExtExclusions {
+		for _, exclExt := range append(defaultExtExclusions, opts.Exclude...) {
 			if ext == exclExt {
 				return true
 			}

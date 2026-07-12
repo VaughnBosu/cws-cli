@@ -273,12 +273,70 @@ func TestPublish_Success(t *testing.T) {
 	defer server.Close()
 
 	client := newTestClient(server.URL)
-	resp, err := client.Publish(context.Background(), "ext123", false)
+	resp, err := client.Publish(context.Background(), "ext123", api.PublishOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if resp.State != "PENDING_REVIEW" {
 		t.Errorf("State = %q, want %q", resp.State, "PENDING_REVIEW")
+	}
+}
+
+func TestPublish_Warnings(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		json.NewEncoder(w).Encode(map[string]any{
+			"itemId": "ext123",
+			"state":  "PENDING_REVIEW",
+			"warningInfo": map[string]any{
+				"warnings": []map[string]any{
+					{"reason": "PERMISSION_WARNING", "description": "Broad host permissions."},
+				},
+			},
+		})
+	}))
+	defer server.Close()
+
+	client := newTestClient(server.URL)
+	resp, err := client.Publish(context.Background(), "ext123", api.PublishOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.WarningInfo == nil || len(resp.WarningInfo.Warnings) != 1 {
+		t.Fatalf("expected 1 warning, got %+v", resp.WarningInfo)
+	}
+	if resp.WarningInfo.Warnings[0].Reason != "PERMISSION_WARNING" {
+		t.Errorf("Reason = %q, want PERMISSION_WARNING", resp.WarningInfo.Warnings[0].Reason)
+	}
+}
+
+func TestPublish_OptionsSerialized(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		var req api.PublishRequest
+		json.Unmarshal(body, &req)
+		if !req.SkipReview {
+			t.Error("expected skipReview true")
+		}
+		if !req.BlockOnWarnings {
+			t.Error("expected blockOnWarnings true")
+		}
+		if len(req.DeployInfos) != 1 || req.DeployInfos[0].DeployPercentage != 25 {
+			t.Errorf("DeployInfos = %+v, want one entry at 25%%", req.DeployInfos)
+		}
+		w.WriteHeader(200)
+		json.NewEncoder(w).Encode(map[string]any{"itemId": "ext123", "state": "PENDING_REVIEW"})
+	}))
+	defer server.Close()
+
+	client := newTestClient(server.URL)
+	_, err := client.Publish(context.Background(), "ext123", api.PublishOptions{
+		SkipReview:       true,
+		BlockOnWarnings:  true,
+		DeployPercentage: 25,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -300,7 +358,7 @@ func TestPublish_Staged(t *testing.T) {
 	defer server.Close()
 
 	client := newTestClient(server.URL)
-	_, err := client.Publish(context.Background(), "ext123", true)
+	_, err := client.Publish(context.Background(), "ext123", api.PublishOptions{Staged: true})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -319,7 +377,7 @@ func TestPublish_Error(t *testing.T) {
 	defer server.Close()
 
 	client := newTestClient(server.URL)
-	_, err := client.Publish(context.Background(), "ext123", false)
+	_, err := client.Publish(context.Background(), "ext123", api.PublishOptions{})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -344,12 +402,8 @@ func TestSetDeployPercentage_Success(t *testing.T) {
 	defer server.Close()
 
 	client := newTestClient(server.URL)
-	resp, err := client.SetDeployPercentage(context.Background(), "ext123", 50)
-	if err != nil {
+	if err := client.SetDeployPercentage(context.Background(), "ext123", 50); err != nil {
 		t.Fatalf("unexpected error: %v", err)
-	}
-	if resp.DeployPercentage != 0 {
-		t.Errorf("DeployPercentage = %d, want 0 for empty V2 response", resp.DeployPercentage)
 	}
 }
 
@@ -366,7 +420,7 @@ func TestSetDeployPercentage_Error(t *testing.T) {
 	defer server.Close()
 
 	client := newTestClient(server.URL)
-	_, err := client.SetDeployPercentage(context.Background(), "ext123", 50)
+	err := client.SetDeployPercentage(context.Background(), "ext123", 50)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -385,12 +439,8 @@ func TestCancelSubmission_Success(t *testing.T) {
 	defer server.Close()
 
 	client := newTestClient(server.URL)
-	resp, err := client.CancelSubmission(context.Background(), "ext123")
-	if err != nil {
+	if err := client.CancelSubmission(context.Background(), "ext123"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
-	}
-	if resp.Status != "" {
-		t.Errorf("Status = %q, want empty status for empty V2 response", resp.Status)
 	}
 }
 
@@ -407,7 +457,7 @@ func TestCancelSubmission_Error(t *testing.T) {
 	defer server.Close()
 
 	client := newTestClient(server.URL)
-	_, err := client.CancelSubmission(context.Background(), "ext123")
+	err := client.CancelSubmission(context.Background(), "ext123")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

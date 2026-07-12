@@ -7,6 +7,7 @@ import (
 )
 
 // FetchStatus retrieves the current status of an extension.
+// The raw response body is returned alongside the parsed struct for --json output.
 func (c *Client) FetchStatus(ctx context.Context, extensionID string) (*StatusResponse, []byte, error) {
 	path := c.itemPath(extensionID, "fetchStatus")
 
@@ -24,25 +25,13 @@ func (c *Client) FetchStatus(ctx context.Context, extensionID string) (*StatusRe
 		}
 	}
 
-	var resp StatusResponse
-	if err := json.Unmarshal(respBody, &resp); err != nil {
-		return nil, nil, fmt.Errorf("failed to parse status response (HTTP %d): %s", statusCode, truncateBody(respBody, 200))
+	if statusCode < 200 || statusCode >= 300 {
+		return nil, respBody, apiError("status check", statusCode, respBody)
 	}
 
-	if statusCode < 200 || statusCode >= 300 {
-		if len(resp.ItemError) > 0 {
-			return &resp, respBody, NewCWSError("status check", statusCode, resp.ItemError, "")
-		}
-		parsed := ParseAPIErrorDetail(respBody)
-		if parsed != nil {
-			return &resp, respBody, NewCWSErrorFromParsed("status check", statusCode, parsed, "")
-		}
-		return &resp, respBody, &CWSError{
-			Operation:  "status check",
-			HTTPStatus: statusCode,
-			Message:    string(respBody),
-			Hint:       HintForHTTPStatus(statusCode),
-		}
+	var resp StatusResponse
+	if err := json.Unmarshal(respBody, &resp); err != nil {
+		return nil, respBody, fmt.Errorf("failed to parse status response (HTTP %d): %s", statusCode, truncateBody(respBody, 200))
 	}
 
 	return &resp, respBody, nil

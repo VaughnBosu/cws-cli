@@ -9,11 +9,15 @@ import (
 	"github.com/vaughnbosu/cws-cli/internal/config"
 )
 
+func defaultExtensions(ec config.ExtensionConfig) map[string]config.ExtensionConfig {
+	return map[string]config.ExtensionConfig{config.DefaultExtension: ec}
+}
+
 // --- ResolveExtensionID tests ---
 
 func TestResolveExtensionID_Flag(t *testing.T) {
-	got, err := config.ResolveExtensionID("flag-id", &config.Config{
-		Extensions: config.ExtensionsConfig{Default: config.ExtensionConfig{ID: "config-id"}},
+	got, err := config.ResolveExtensionID("flag-id", "", &config.Config{
+		Extensions: defaultExtensions(config.ExtensionConfig{ID: "config-id"}),
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -25,7 +29,7 @@ func TestResolveExtensionID_Flag(t *testing.T) {
 
 func TestResolveExtensionID_EnvVar(t *testing.T) {
 	t.Setenv("CWS_EXTENSION_ID", "env-id")
-	got, err := config.ResolveExtensionID("", nil)
+	got, err := config.ResolveExtensionID("", "", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -35,8 +39,8 @@ func TestResolveExtensionID_EnvVar(t *testing.T) {
 }
 
 func TestResolveExtensionID_Config(t *testing.T) {
-	got, err := config.ResolveExtensionID("", &config.Config{
-		Extensions: config.ExtensionsConfig{Default: config.ExtensionConfig{ID: "config-id"}},
+	got, err := config.ResolveExtensionID("", "", &config.Config{
+		Extensions: defaultExtensions(config.ExtensionConfig{ID: "config-id"}),
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -46,8 +50,49 @@ func TestResolveExtensionID_Config(t *testing.T) {
 	}
 }
 
+func TestResolveExtensionID_NamedProfile(t *testing.T) {
+	cfg := &config.Config{
+		Extensions: map[string]config.ExtensionConfig{
+			"default": {ID: "default-id"},
+			"beta":    {ID: "beta-id"},
+		},
+	}
+	got, err := config.ResolveExtensionID("", "beta", cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "beta-id" {
+		t.Errorf("got %q, want %q", got, "beta-id")
+	}
+}
+
+func TestResolveExtensionID_NamedProfileMissing(t *testing.T) {
+	_, err := config.ResolveExtensionID("", "nope", &config.Config{})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "nope") {
+		t.Errorf("error = %q, want mention of missing profile name", err.Error())
+	}
+}
+
+// Env var CWS_EXTENSION_ID must not hijack an explicitly named profile.
+func TestResolveExtensionID_NamedProfileIgnoresEnv(t *testing.T) {
+	t.Setenv("CWS_EXTENSION_ID", "env-id")
+	cfg := &config.Config{
+		Extensions: map[string]config.ExtensionConfig{"beta": {ID: "beta-id"}},
+	}
+	got, err := config.ResolveExtensionID("", "beta", cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "beta-id" {
+		t.Errorf("got %q, want %q", got, "beta-id")
+	}
+}
+
 func TestResolveExtensionID_None(t *testing.T) {
-	_, err := config.ResolveExtensionID("", &config.Config{})
+	_, err := config.ResolveExtensionID("", "", &config.Config{})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -56,8 +101,8 @@ func TestResolveExtensionID_None(t *testing.T) {
 // --- ResolveSource tests ---
 
 func TestResolveSource_Arg(t *testing.T) {
-	got := config.ResolveSource("./dist", &config.Config{
-		Extensions: config.ExtensionsConfig{Default: config.ExtensionConfig{Source: "./build"}},
+	got := config.ResolveSource("./dist", "", &config.Config{
+		Extensions: defaultExtensions(config.ExtensionConfig{Source: "./build"}),
 	})
 	if got != "./dist" {
 		t.Errorf("got %q, want %q", got, "./dist")
@@ -65,8 +110,8 @@ func TestResolveSource_Arg(t *testing.T) {
 }
 
 func TestResolveSource_Config(t *testing.T) {
-	got := config.ResolveSource("", &config.Config{
-		Extensions: config.ExtensionsConfig{Default: config.ExtensionConfig{Source: "./build"}},
+	got := config.ResolveSource("", "", &config.Config{
+		Extensions: defaultExtensions(config.ExtensionConfig{Source: "./build"}),
 	})
 	if got != "./build" {
 		t.Errorf("got %q, want %q", got, "./build")
@@ -74,7 +119,7 @@ func TestResolveSource_Config(t *testing.T) {
 }
 
 func TestResolveSource_Default(t *testing.T) {
-	got := config.ResolveSource("", &config.Config{})
+	got := config.ResolveSource("", "", &config.Config{})
 	if got != "." {
 		t.Errorf("got %q, want %q", got, ".")
 	}
@@ -177,7 +222,7 @@ func TestWriteConfig_Full(t *testing.T) {
 			ClientSecret: "my-secret",
 			RefreshToken: "my-token",
 		},
-		Extensions: config.ExtensionsConfig{Default: config.ExtensionConfig{ID: "ext-abc"}},
+		Extensions: defaultExtensions(config.ExtensionConfig{ID: "ext-abc"}),
 	}
 
 	if err := config.WriteConfig(path, cfg); err != nil {
@@ -202,7 +247,7 @@ func TestWriteConfig_ProjectOnly(t *testing.T) {
 	path := filepath.Join(dir, "cws.toml")
 
 	cfg := &config.Config{
-		Extensions: config.ExtensionsConfig{Default: config.ExtensionConfig{ID: "ext-abc", Source: "./dist"}},
+		Extensions: defaultExtensions(config.ExtensionConfig{ID: "ext-abc", Source: "./dist"}),
 	}
 
 	if err := config.WriteConfig(path, cfg); err != nil {
@@ -263,8 +308,8 @@ id = "ext-from-file"
 	if cfg.Auth.ClientID != "id-from-file" {
 		t.Errorf("ClientID = %q, want %q", cfg.Auth.ClientID, "id-from-file")
 	}
-	if cfg.Extensions.Default.ID != "ext-from-file" {
-		t.Errorf("ExtensionID = %q, want %q", cfg.Extensions.Default.ID, "ext-from-file")
+	if cfg.Extension(config.DefaultExtension).ID != "ext-from-file" {
+		t.Errorf("ExtensionID = %q, want %q", cfg.Extension(config.DefaultExtension).ID, "ext-from-file")
 	}
 }
 
@@ -291,7 +336,83 @@ func TestLoad_EnvVarWithNoFile(t *testing.T) {
 	if cfg.PublisherID != "pub-from-env" {
 		t.Errorf("PublisherID = %q, want %q", cfg.PublisherID, "pub-from-env")
 	}
-	if cfg.Extensions.Default.ID != "ext-from-env" {
-		t.Errorf("ExtensionID = %q, want %q", cfg.Extensions.Default.ID, "ext-from-env")
+	if cfg.Extension(config.DefaultExtension).ID != "ext-from-env" {
+		t.Errorf("ExtensionID = %q, want %q", cfg.Extension(config.DefaultExtension).ID, "ext-from-env")
+	}
+}
+
+// Regression test: env vars must override local cws.toml values
+// (documented priority: env vars > local cws.toml > global cws.toml).
+func TestLoad_EnvVarOverridesLocalFile(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "cws.toml")
+	os.WriteFile(configPath, []byte(`
+publisher_id = "pub-from-file"
+
+[auth]
+client_id = "id-from-file"
+client_secret = "secret-from-file"
+refresh_token = "token-from-file"
+`), 0600)
+
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	t.Setenv("CWS_CLIENT_ID", "id-from-env")
+	t.Setenv("CWS_REFRESH_TOKEN", "token-from-env")
+	t.Setenv("CWS_PUBLISHER_ID", "pub-from-env")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("Load error: %v", err)
+	}
+	if cfg.Auth.ClientID != "id-from-env" {
+		t.Errorf("ClientID = %q, want env value to win over local file", cfg.Auth.ClientID)
+	}
+	if cfg.Auth.RefreshToken != "token-from-env" {
+		t.Errorf("RefreshToken = %q, want env value to win over local file", cfg.Auth.RefreshToken)
+	}
+	if cfg.PublisherID != "pub-from-env" {
+		t.Errorf("PublisherID = %q, want env value to win over local file", cfg.PublisherID)
+	}
+	// Unset-in-env values still come from the file.
+	if cfg.Auth.ClientSecret != "secret-from-file" {
+		t.Errorf("ClientSecret = %q, want file value when env is unset", cfg.Auth.ClientSecret)
+	}
+}
+
+// Regression test: a malformed cws.toml must be reported, not silently ignored.
+func TestLoad_MalformedLocalFile(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "cws.toml")
+	os.WriteFile(configPath, []byte(`publisher_id = "unclosed`), 0600)
+
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	_, err := config.Load()
+	if err == nil {
+		t.Fatal("expected parse error for malformed cws.toml, got nil")
+	}
+	if !strings.Contains(err.Error(), "cws.toml") {
+		t.Errorf("error = %q, want mention of cws.toml", err.Error())
+	}
+}
+
+// Regression test: a file named exactly "cws" (e.g. a locally built binary)
+// must not be picked up and parsed as the config file.
+func TestLoad_IgnoresBareCwsFile(t *testing.T) {
+	dir := t.TempDir()
+	// Simulate `go build -o cws .` output: binary junk in a file named "cws".
+	os.WriteFile(filepath.Join(dir, "cws"), []byte("\xcf\xfa\xed\xfenot toml"), 0755)
+
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+
+	if _, err := config.Load(); err != nil {
+		t.Fatalf("Load error with bare cws file present: %v", err)
 	}
 }

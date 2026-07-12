@@ -4,9 +4,6 @@ import (
 	"context"
 
 	"github.com/spf13/cobra"
-	"github.com/vaughnbosu/cws-cli/internal/api"
-	"github.com/vaughnbosu/cws-cli/internal/auth"
-	"github.com/vaughnbosu/cws-cli/internal/config"
 	"github.com/vaughnbosu/cws-cli/internal/output"
 )
 
@@ -22,31 +19,21 @@ func init() {
 }
 
 func runCancel(cmd *cobra.Command, args []string) error {
-	cfg, err := config.Load()
+	actx, err := newAPIContext(cmd)
 	if err != nil {
 		return err
 	}
-	if err := config.ValidateAuth(cfg); err != nil {
-		return err
-	}
-
-	extensionIDFlag, _ := cmd.Flags().GetString("extension-id")
-	extensionID, err := config.ResolveExtensionID(extensionIDFlag, cfg)
-	if err != nil {
-		return err
-	}
-
-	authenticator := auth.NewOAuthAuthenticator(cfg.Auth.ClientID, cfg.Auth.ClientSecret, cfg.Auth.RefreshToken)
-	client := api.NewClient(authenticator, cfg.PublisherID)
 	ctx := context.Background()
 
-	output.Info("Cancelling submission for extension %s...", extensionID)
+	output.Info("Cancelling submission for extension %s...", actx.extensionID)
 
-	_, err = client.CancelSubmission(ctx, extensionID)
-	if err != nil {
+	if err := actx.client.CancelSubmission(ctx, actx.extensionID); err != nil {
 		return err
 	}
 
 	output.Info("Submission cancelled successfully.")
+	if output.JSONMode() {
+		return output.EmitJSON(map[string]any{"cancelled": true})
+	}
 	return nil
 }

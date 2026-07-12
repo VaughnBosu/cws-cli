@@ -6,8 +6,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/vaughnbosu/cws-cli/internal/api"
-	"github.com/vaughnbosu/cws-cli/internal/auth"
-	"github.com/vaughnbosu/cws-cli/internal/config"
 	"github.com/vaughnbosu/cws-cli/internal/output"
 )
 
@@ -18,83 +16,67 @@ var statusCmd = &cobra.Command{
 }
 
 func init() {
-	statusCmd.Flags().Bool("json", false, "Output raw JSON response")
 	rootCmd.AddCommand(statusCmd)
 }
 
 func runStatus(cmd *cobra.Command, args []string) error {
-	cfg, err := config.Load()
+	actx, err := newAPIContext(cmd)
 	if err != nil {
 		return err
 	}
-	if err := config.ValidateAuth(cfg); err != nil {
-		return err
-	}
-
-	extensionIDFlag, _ := cmd.Flags().GetString("extension-id")
-	extensionID, err := config.ResolveExtensionID(extensionIDFlag, cfg)
-	if err != nil {
-		return err
-	}
-
-	jsonOutput, _ := cmd.Flags().GetBool("json")
-
-	authenticator := auth.NewOAuthAuthenticator(cfg.Auth.ClientID, cfg.Auth.ClientSecret, cfg.Auth.RefreshToken)
-	client := api.NewClient(authenticator, cfg.PublisherID)
 	ctx := context.Background()
 
-	resp, rawJSON, err := client.FetchStatus(ctx, extensionID)
+	resp, rawJSON, err := actx.client.FetchStatus(ctx, actx.extensionID)
 	if err != nil {
 		return err
 	}
 
-	if jsonOutput {
+	if output.JSONMode() {
 		fmt.Println(string(rawJSON))
 		return nil
 	}
 
 	// Formatted output
-	output.Info("Extension: %s", extensionID)
-	if resp.PublishedItemRevisionStatus != nil {
-		output.Info("")
-		output.Info("Published:")
-		output.Info("  State:   %s", FormatState(resp.PublishedItemRevisionStatus.State))
-		if resp.PublishedItemRevisionStatus.CrxVersion != "" {
-			output.Info("  Version: %s", resp.PublishedItemRevisionStatus.CrxVersion)
-		}
-		for _, ch := range resp.PublishedItemRevisionStatus.DistributionChannels {
-			if ch.CrxVersion != "" {
-				output.Info("  Version: %s", ch.CrxVersion)
-			}
-			output.Info("  Deploy:  %d%%", ch.DeployPercentage)
-		}
+	output.Info("Extension: %s", actx.extensionID)
+
+	// Policy flags first — these are the most urgent facts about an item.
+	if resp.TakenDown {
+		output.Warn("This extension has been TAKEN DOWN for a policy violation. Check the developer dashboard: https://chrome.google.com/webstore/devconsole")
 	}
-	if resp.SubmittedItemRevisionStatus != nil {
-		output.Info("")
-		output.Info("Submitted:")
-		output.Info("  State:   %s", FormatState(resp.SubmittedItemRevisionStatus.State))
-		for _, ch := range resp.SubmittedItemRevisionStatus.DistributionChannels {
-			if ch.CrxVersion != "" {
-				output.Info("  Version: %s", ch.CrxVersion)
-			}
-			output.Info("  Deploy:  %d%%", ch.DeployPercentage)
-		}
+	if resp.Warned {
+		output.Warn("This extension has a policy WARNING and may be taken down if not resolved. Check the developer dashboard: https://chrome.google.com/webstore/devconsole")
 	}
+
+	printRevision("Published", resp.PublishedItemRevisionStatus)
+	printRevision("Submitted", resp.SubmittedItemRevisionStatus)
+
 	if resp.LastAsyncUploadState != "" {
 		output.Info("")
 		output.Info("Upload:    %s", resp.LastAsyncUploadState)
-	}
-	if len(resp.ItemError) > 0 {
-		output.Info("Errors:")
-		for _, e := range resp.ItemError {
-			output.Info("  - [%s] %s", e.ErrorCode, e.ErrorDetail)
-			if hint := api.HintForItemError(e.ErrorCode); hint != "" {
-				output.Hint("%s", hint)
-			}
+		if api.IsUploadFailed(resp.LastAsyncUploadState) {
+			output.Hint("The last upload failed. The v2 API does not return failure details; check the developer dashboard.")
 		}
 	}
 
 	return nil
+}
+
+func printRevision(label string, rev *api.ItemRevisionStatus) {
+	if rev == nil {
+		return
+	}
+	output.Info("")
+	output.Info("%s:", label)
+	output.Info("  State:   %s", FormatState(rev.State))
+	if rev.CrxVersion != "" {
+		output.Info("  Version: %s", rev.CrxVersion)
+	}
+	for _, ch := range rev.DistributionChannels {
+		if ch.CrxVersion != "" && ch.CrxVersion != rev.CrxVersion {
+			output.Info("  Version: %s", ch.CrxVersion)
+		}
+		output.Info("  Deploy:  %d%%", ch.DeployPercentage)
+	}
 }
 
 // FormatState converts an API state string to a human-readable label.

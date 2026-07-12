@@ -7,12 +7,22 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/vaughnbosu/cws-cli/internal/auth"
 )
 
 const defaultBaseURL = "https://chromewebstore.googleapis.com"
+
+// jsonCallTimeout bounds metadata calls (publish, status, rollout, cancel).
+// Uploads get uploadTimeout since the body transfer can be large and slow.
+const (
+	jsonCallTimeout = 2 * time.Minute
+	uploadTimeout   = 60 * time.Minute
+)
+
+const maxRetries = 3
 
 // Client is the Chrome Web Store API V2 client.
 type Client struct {
@@ -30,59 +40,120 @@ func (c *Client) baseURL() string {
 }
 
 // NewClient creates a new API client.
+// Per-call deadlines are set in doRequest rather than on the http.Client,
+// so a large upload body is not bounded by a metadata-call timeout.
 func NewClient(authenticator auth.Authenticator, publisherID string) *Client {
 	return &Client{
-		httpClient: &http.Client{
-			Timeout: 5 * time.Minute,
-		},
+		httpClient:  &http.Client{},
 		auth:        authenticator,
 		publisherID: publisherID,
 	}
 }
 
-func (c *Client) doRequest(ctx context.Context, method, path string, body io.Reader, contentType string) ([]byte, int, error) {
+// retryableStatus reports whether a response status is worth retrying.
+func retryableStatus(code int) bool {
+	return code == 429 || code == 500 || code == 502 || code == 503 || code == 504
+}
+
+// retryDelay returns how long to wait before the given attempt (0-based),
+// honoring a Retry-After header when present.
+func retryDelay(attempt int, resp *http.Response) time.Duration {
+	if resp != nil {
+		if ra := resp.Header.Get("Retry-After"); ra != "" {
+			if secs, err := strconv.Atoi(ra); err == nil && secs > 0 && secs <= 60 {
+				return time.Duration(secs) * time.Second
+			}
+		}
+	}
+	return time.Duration(1<<attempt) * time.Second // 1s, 2s, 4s
+}
+
+func (c *Client) doRequest(ctx context.Context, method, path string, body []byte, contentType string, timeout time.Duration) ([]byte, int, error) {
 	token, err := c.auth.AccessToken(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
 
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
 	url := c.baseURL() + path
-	req, err := http.NewRequestWithContext(ctx, method, url, body)
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to create request: %w", err)
+
+	var respBody []byte
+	var statusCode int
+	var lastErr error
+
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		var reader io.Reader
+		if body != nil {
+			reader = bytes.NewReader(body)
+		}
+		req, err := http.NewRequestWithContext(ctx, method, url, reader)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to create request: %w", err)
+		}
+		req.Header.Set("Authorization", "Bearer "+token)
+		if contentType != "" {
+			req.Header.Set("Content-Type", contentType)
+		}
+
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			lastErr = fmt.Errorf("request failed: %w. Check your network connection and try again", err)
+			if ctx.Err() != nil {
+				return nil, 0, lastErr
+			}
+			select {
+			case <-time.After(retryDelay(attempt, nil)):
+				continue
+			case <-ctx.Done():
+				return nil, 0, lastErr
+			}
+		}
+
+		respBody, err = io.ReadAll(resp.Body)
+		resp.Body.Close()
+		statusCode = resp.StatusCode
+		if err != nil {
+			return nil, statusCode, fmt.Errorf("failed to read response: %w", err)
+		}
+
+		if retryableStatus(statusCode) && attempt < maxRetries-1 {
+			select {
+			case <-time.After(retryDelay(attempt, resp)):
+				continue
+			case <-ctx.Done():
+				return respBody, statusCode, nil
+			}
+		}
+
+		return respBody, statusCode, nil
 	}
 
-	req.Header.Set("Authorization", "Bearer "+token)
-	if contentType != "" {
-		req.Header.Set("Content-Type", contentType)
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, 0, fmt.Errorf("request failed: %w. Check your network connection and try again", err)
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, resp.StatusCode, fmt.Errorf("failed to read response: %w", err)
-	}
-
-	return respBody, resp.StatusCode, nil
+	return nil, statusCode, lastErr
 }
 
 func (c *Client) doJSON(ctx context.Context, method, path string, reqBody any) ([]byte, int, error) {
-	var body io.Reader
+	var body []byte
 	var contentType string
 	if reqBody != nil {
 		data, err := json.Marshal(reqBody)
 		if err != nil {
 			return nil, 0, fmt.Errorf("failed to marshal request body: %w", err)
 		}
-		body = bytes.NewReader(data)
+		body = data
 		contentType = "application/json"
 	}
-	return c.doRequest(ctx, method, path, body, contentType)
+	return c.doRequest(ctx, method, path, body, contentType, jsonCallTimeout)
+}
+
+// apiError builds a CWSError for a non-2xx response, preferring the structured
+// Google error body when one is present.
+func apiError(operation string, statusCode int, body []byte) *CWSError {
+	if parsed := ParseAPIErrorDetail(body); parsed != nil {
+		return NewCWSErrorFromParsed(operation, statusCode, parsed, "")
+	}
+	return NewOperationError(operation, statusCode, truncateBody(body, 200))
 }
 
 // ParsedAPIError holds structured information extracted from a Google API error response.

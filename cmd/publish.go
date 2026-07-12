@@ -2,12 +2,10 @@ package cmd
 
 import (
 	"context"
-	"strings"
+	"fmt"
 
 	"github.com/spf13/cobra"
 	"github.com/vaughnbosu/cws-cli/internal/api"
-	"github.com/vaughnbosu/cws-cli/internal/auth"
-	"github.com/vaughnbosu/cws-cli/internal/config"
 	"github.com/vaughnbosu/cws-cli/internal/output"
 )
 
@@ -16,54 +14,76 @@ var publishCmd = &cobra.Command{
 	Short: "Publish the most recently uploaded version",
 	Long: `Publish the most recently uploaded version of an extension.
 
-Use --staged to submit for review without auto-publishing after approval.`,
+Use --staged to submit for review without auto-publishing after approval.
+Use --deploy-percentage to start a partial rollout on publish (requires
+10,000+ seven-day active users).`,
 	RunE: runPublish,
 }
 
 func init() {
 	publishCmd.Flags().Bool("staged", false, "Use STAGED_PUBLISH: submit for review but don't auto-publish")
+	publishCmd.Flags().Bool("skip-review", false, "Attempt to skip item review (only some changes are eligible)")
+	publishCmd.Flags().Bool("block-on-warnings", false, "Fail the publish if any validation warnings are found")
+	publishCmd.Flags().Int("deploy-percentage", 0, "Initial rollout percentage (1-99; omit for full rollout)")
 	rootCmd.AddCommand(publishCmd)
 }
 
 func runPublish(cmd *cobra.Command, args []string) error {
-	cfg, err := config.Load()
-	if err != nil {
-		return err
-	}
-	if err := config.ValidateAuth(cfg); err != nil {
-		return err
-	}
-
-	extensionIDFlag, _ := cmd.Flags().GetString("extension-id")
-	extensionID, err := config.ResolveExtensionID(extensionIDFlag, cfg)
-	if err != nil {
-		return err
-	}
-
 	staged, _ := cmd.Flags().GetBool("staged")
+	skipReview, _ := cmd.Flags().GetBool("skip-review")
+	blockOnWarnings, _ := cmd.Flags().GetBool("block-on-warnings")
+	deployPercentage, _ := cmd.Flags().GetInt("deploy-percentage")
+	if cmd.Flags().Changed("deploy-percentage") && (deployPercentage < 1 || deployPercentage > 99) {
+		return fmt.Errorf("--deploy-percentage must be between 1 and 99 (omit the flag for a full rollout)")
+	}
 
-	authenticator := auth.NewOAuthAuthenticator(cfg.Auth.ClientID, cfg.Auth.ClientSecret, cfg.Auth.RefreshToken)
-	client := api.NewClient(authenticator, cfg.PublisherID)
+	actx, err := newAPIContext(cmd)
+	if err != nil {
+		return err
+	}
+
 	ctx := context.Background()
 
 	if staged {
-		output.Info("Submitting extension %s for staged publish...", extensionID)
+		output.Info("Submitting extension %s for staged publish...", actx.extensionID)
 	} else {
-		output.Info("Publishing extension %s...", extensionID)
+		output.Info("Publishing extension %s...", actx.extensionID)
 	}
 
-	resp, err := client.Publish(ctx, extensionID, staged)
+	resp, err := actx.client.Publish(ctx, actx.extensionID, api.PublishOptions{
+		Staged:           staged,
+		SkipReview:       skipReview,
+		BlockOnWarnings:  blockOnWarnings,
+		DeployPercentage: deployPercentage,
+	})
 	if err != nil {
 		return err
 	}
 
+	printPublishWarnings(resp)
+
 	if resp.State != "" {
 		output.Info("State: %s", FormatState(resp.State))
-	} else if len(resp.Status) > 0 {
-		output.Info("Status: %s", strings.Join(resp.Status, ", "))
 	} else {
 		output.Info("Publish submitted successfully.")
 	}
 
+	if output.JSONMode() {
+		return output.EmitJSON(resp)
+	}
 	return nil
+}
+
+// printPublishWarnings surfaces non-blocking validation warnings from a publish.
+func printPublishWarnings(resp *api.PublishResponse) {
+	if resp == nil || resp.WarningInfo == nil {
+		return
+	}
+	for _, w := range resp.WarningInfo.Warnings {
+		if w.Reason != "" {
+			output.Warn("[%s] %s", w.Reason, w.Description)
+		} else {
+			output.Warn("%s", w.Description)
+		}
+	}
 }

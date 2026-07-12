@@ -1,53 +1,83 @@
 package api
 
-// UploadResponse represents the response from the upload endpoint.
+// Types in this file mirror the Chrome Web Store API v2 contract
+// (https://chromewebstore.googleapis.com/$discovery/rest?version=v2).
+
+// UploadResponse represents UploadItemPackageResponse.
 type UploadResponse struct {
-	ItemID      string      `json:"itemId,omitempty"`
-	Name        string      `json:"name,omitempty"`
-	CrxVersion  string      `json:"crxVersion,omitempty"`
-	UploadState string      `json:"uploadState"`
-	ItemError   []ItemError `json:"itemError,omitempty"`
+	Name        string `json:"name,omitempty"`
+	ItemID      string `json:"itemId,omitempty"`
+	CrxVersion  string `json:"crxVersion,omitempty"`
+	UploadState string `json:"uploadState"`
 }
 
-// ItemError represents an error returned by the API.
-type ItemError struct {
-	ErrorCode   string `json:"error_code"`
-	ErrorDetail string `json:"error_detail"`
-}
-
-// PublishRequest represents the request body for the publish endpoint.
+// PublishRequest represents PublishItemRequest.
 type PublishRequest struct {
-	PublishType string `json:"publishType,omitempty"`
-	SkipReview  bool   `json:"skipReview,omitempty"`
+	PublishType     string       `json:"publishType,omitempty"`
+	SkipReview      bool         `json:"skipReview,omitempty"`
+	BlockOnWarnings bool         `json:"blockOnWarnings,omitempty"`
+	DeployInfos     []DeployInfo `json:"deployInfos,omitempty"`
 }
 
-// PublishResponse represents the response from the publish endpoint.
+// DeployInfo carries the desired initial rollout percentage for a publish.
+type DeployInfo struct {
+	DeployPercentage int `json:"deployPercentage"`
+}
+
+// PublishResponse represents PublishItemResponse.
 type PublishResponse struct {
-	ItemID     string   `json:"itemId,omitempty"`
-	Name       string   `json:"name,omitempty"`
-	State      string   `json:"state,omitempty"`
-	Status     []string `json:"status,omitempty"`
-	StatusCode string   `json:"statusCode,omitempty"`
+	Name        string        `json:"name,omitempty"`
+	ItemID      string        `json:"itemId,omitempty"`
+	State       string        `json:"state,omitempty"`
+	WarningInfo *WarningsInfo `json:"warningInfo,omitempty"`
 }
 
-// StatusResponse represents the response from the fetchStatus endpoint (V2 API).
+// WarningsInfo holds non-blocking warnings returned by a publish.
+type WarningsInfo struct {
+	Warnings []Warning `json:"warnings,omitempty"`
+}
+
+// Warning is a single non-blocking publish warning.
+type Warning struct {
+	Reason      string `json:"reason,omitempty"`
+	Description string `json:"description,omitempty"`
+}
+
+// StatusResponse represents FetchItemStatusResponse.
 type StatusResponse struct {
 	Name                        string              `json:"name"`
 	ItemID                      string              `json:"itemId"`
+	PublicKey                   string              `json:"publicKey,omitempty"`
+	Warned                      bool                `json:"warned,omitempty"`
+	TakenDown                   bool                `json:"takenDown,omitempty"`
 	PublishedItemRevisionStatus *ItemRevisionStatus `json:"publishedItemRevisionStatus,omitempty"`
 	SubmittedItemRevisionStatus *ItemRevisionStatus `json:"submittedItemRevisionStatus,omitempty"`
 	LastAsyncUploadState        string              `json:"lastAsyncUploadState,omitempty"`
-	ItemError                   []ItemError         `json:"itemError,omitempty"`
 }
 
-// ItemRevisionStatus represents the status of an item revision (published, in-review, or draft).
+// ItemRevisionStatus represents the status of an item revision (published or submitted).
 type ItemRevisionStatus struct {
 	State                string                `json:"state"`
 	CrxVersion           string                `json:"crxVersion,omitempty"`
 	DistributionChannels []DistributionChannel `json:"distributionChannels,omitempty"`
 }
 
-// DistributionChannel represents a distribution channel for a published extension.
+// Version returns the revision's crxVersion, falling back to the first
+// distribution channel's version.
+func (r *ItemRevisionStatus) Version() string {
+	if r == nil {
+		return ""
+	}
+	if r.CrxVersion != "" {
+		return r.CrxVersion
+	}
+	if len(r.DistributionChannels) > 0 {
+		return r.DistributionChannels[0].CrxVersion
+	}
+	return ""
+}
+
+// DistributionChannel represents a distribution channel for a revision.
 type DistributionChannel struct {
 	DeployPercentage int    `json:"deployPercentage"`
 	CrxVersion       string `json:"crxVersion"`
@@ -80,20 +110,9 @@ type FieldViolation struct {
 	Reason      string `json:"reason,omitempty"`
 }
 
-// DeployPercentageRequest represents the request body for setPublishedDeployPercentage.
+// DeployPercentageRequest represents SetPublishedDeployPercentageRequest.
 type DeployPercentageRequest struct {
 	DeployPercentage int `json:"deployPercentage"`
-}
-
-// DeployPercentageResponse represents the response from setPublishedDeployPercentage.
-type DeployPercentageResponse struct {
-	DeployPercentage int    `json:"deployPercentage,omitempty"`
-	Status           string `json:"status,omitempty"`
-}
-
-// CancelResponse represents the response from cancelSubmission.
-type CancelResponse struct {
-	Status string `json:"status,omitempty"`
 }
 
 const (
@@ -102,6 +121,11 @@ const (
 	UploadStateInProgress  = "IN_PROGRESS"
 	UploadStateFailed      = "FAILED"
 	UploadStateNotFound    = "NOT_FOUND"
+)
+
+const (
+	PublishTypeDefault = "DEFAULT_PUBLISH"
+	PublishTypeStaged  = "STAGED_PUBLISH"
 )
 
 func IsUploadInProgress(state string) bool {

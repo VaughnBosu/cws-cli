@@ -7,8 +7,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/vaughnbosu/cws-cli/internal/api"
-	"github.com/vaughnbosu/cws-cli/internal/auth"
-	"github.com/vaughnbosu/cws-cli/internal/config"
 	"github.com/vaughnbosu/cws-cli/internal/output"
 )
 
@@ -32,45 +30,37 @@ func runRollout(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("percentage must be a number between 1 and 100")
 	}
 
-	cfg, err := config.Load()
+	actx, err := newAPIContext(cmd)
 	if err != nil {
 		return err
 	}
-	if err := config.ValidateAuth(cfg); err != nil {
-		return err
-	}
-
-	extensionIDFlag, _ := cmd.Flags().GetString("extension-id")
-	extensionID, err := config.ResolveExtensionID(extensionIDFlag, cfg)
-	if err != nil {
-		return err
-	}
-
-	authenticator := auth.NewOAuthAuthenticator(cfg.Auth.ClientID, cfg.Auth.ClientSecret, cfg.Auth.RefreshToken)
-	client := api.NewClient(authenticator, cfg.PublisherID)
 	ctx := context.Background()
 
-	output.Info("Setting deploy percentage to %d%% for extension %s...", percentage, extensionID)
+	output.Info("Setting deploy percentage to %d%% for extension %s...", percentage, actx.extensionID)
 
-	resp, err := client.SetDeployPercentage(ctx, extensionID, percentage)
-	if err != nil {
+	if err := actx.client.SetDeployPercentage(ctx, actx.extensionID, percentage); err != nil {
 		return err
 	}
 
-	status, _, err := client.FetchStatus(ctx, extensionID)
-	if err == nil {
-		if current := publishedDeployPercentage(status); current >= 0 {
-			output.Info("Deploy percentage set to %d%%.", current)
-			return nil
-		}
+	// Confirm against a fresh status read. The value may lag briefly after the
+	// write, so only claim the live value when it matches the request.
+	confirmed := -1
+	if status, _, err := actx.client.FetchStatus(ctx, actx.extensionID); err == nil {
+		confirmed = publishedDeployPercentage(status)
 	}
 
-	if resp.DeployPercentage > 0 {
-		output.Info("Deploy percentage set to %d%%.", resp.DeployPercentage)
-		return nil
+	if confirmed == percentage {
+		output.Info("Deploy percentage set to %d%%.", percentage)
+	} else {
+		output.Info("Deploy percentage update accepted. Run 'cws status' to confirm the live value.")
 	}
 
-	output.Info("Deploy percentage update accepted. Run 'cws status' to confirm the live value.")
+	if output.JSONMode() {
+		return output.EmitJSON(map[string]any{
+			"requested": percentage,
+			"confirmed": confirmed == percentage,
+		})
+	}
 	return nil
 }
 

@@ -13,9 +13,10 @@ import (
 
 // Manifest represents the parsed fields from a Chrome extension manifest.json.
 type Manifest struct {
-	Name            string `json:"name"`
-	Version         string `json:"version"`
-	ManifestVersion int    `json:"manifest_version"`
+	Name            string            `json:"name"`
+	Version         string            `json:"version"`
+	ManifestVersion int               `json:"manifest_version"`
+	Icons           map[string]string `json:"icons,omitempty"`
 }
 
 // Parse reads and parses a manifest.json file from disk.
