@@ -112,7 +112,7 @@ install_binary() {
         printf "Error: %s is not writable\n" "$dir" >&2
         printf "Re-run with sudo or set CWS_INSTALL_DIR to a writable directory:\n" >&2
         printf "  sudo sh -c 'curl -fsSL https://vaughnbosu.github.io/cws-cli/install.sh | sh'\n" >&2
-        printf "  CWS_INSTALL_DIR=~/.local/bin curl -fsSL https://vaughnbosu.github.io/cws-cli/install.sh | sh\n" >&2
+        printf "  curl -fsSL https://vaughnbosu.github.io/cws-cli/install.sh | CWS_INSTALL_DIR=~/.local/bin sh\n" >&2
         exit 1
     fi
 
