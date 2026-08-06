@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/vaughnbosu/cws-cli/internal/auth"
-	"github.com/vaughnbosu/cws-cli/internal/config"
+	"github.com/vaughnbosu/cws-cli/pkg/auth"
+	"github.com/vaughnbosu/cws-cli/pkg/config"
 	"github.com/vaughnbosu/cws-cli/internal/output"
 )
 

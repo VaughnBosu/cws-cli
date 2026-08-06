@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vaughnbosu/cws-cli/internal/config"
+	"github.com/vaughnbosu/cws-cli/pkg/config"
 )
 
 func defaultExtensions(ec config.ExtensionConfig) map[string]config.ExtensionConfig {

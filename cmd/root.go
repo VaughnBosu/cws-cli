@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/vaughnbosu/cws-cli/internal/api"
+	"github.com/vaughnbosu/cws-cli/pkg/api"
 	"github.com/vaughnbosu/cws-cli/internal/output"
 )
 

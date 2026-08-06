@@ -5,8 +5,9 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/vaughnbosu/cws-cli/internal/api"
 	"github.com/vaughnbosu/cws-cli/internal/output"
+	"github.com/vaughnbosu/cws-cli/pkg/api"
+	"github.com/vaughnbosu/cws-cli/pkg/service"
 )
 
 var publishCmd = &cobra.Command{
@@ -42,15 +43,13 @@ func runPublish(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	ctx := context.Background()
-
 	if staged {
-		output.Info("Submitting extension %s for staged publish...", actx.extensionID)
+		output.Info("Submitting extension %s for staged publish...", actx.ExtensionID)
 	} else {
-		output.Info("Publishing extension %s...", actx.extensionID)
+		output.Info("Publishing extension %s...", actx.ExtensionID)
 	}
 
-	resp, err := actx.client.Publish(ctx, actx.extensionID, api.PublishOptions{
+	resp, err := service.Publish(context.Background(), actx, service.PublishOptions{
 		Staged:           staged,
 		SkipReview:       skipReview,
 		BlockOnWarnings:  blockOnWarnings,
@@ -63,7 +62,7 @@ func runPublish(cmd *cobra.Command, args []string) error {
 	printPublishWarnings(resp)
 
 	if resp.State != "" {
-		output.Info("State: %s", FormatState(resp.State))
+		output.Info("State: %s", service.FormatState(resp.State))
 	} else {
 		output.Info("Publish submitted successfully.")
 	}
@@ -74,7 +73,6 @@ func runPublish(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// printPublishWarnings surfaces non-blocking validation warnings from a publish.
 func printPublishWarnings(resp *api.PublishResponse) {
 	if resp == nil || resp.WarningInfo == nil {
 		return

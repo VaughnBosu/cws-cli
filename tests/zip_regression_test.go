@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	cwszip "github.com/vaughnbosu/cws-cli/internal/zip"
+	cwszip "github.com/vaughnbosu/cws-cli/pkg/zip"
 )
 
 // Regression test: a symlinked source directory must be resolved and zipped,

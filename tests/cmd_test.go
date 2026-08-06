@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/vaughnbosu/cws-cli/cmd"
+	"github.com/vaughnbosu/cws-cli/pkg/service"
 )
 
 // --- FormatState tests ---
@@ -26,7 +27,7 @@ func TestFormatState(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			got := cmd.FormatState(tt.input)
+			got := service.FormatState(tt.input)
 			if got != tt.want {
 				t.Errorf("FormatState(%q) = %q, want %q", tt.input, got, tt.want)
 			}

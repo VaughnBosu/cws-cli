@@ -6,8 +6,8 @@ import (
 	"strconv"
 
 	"github.com/spf13/cobra"
-	"github.com/vaughnbosu/cws-cli/internal/api"
 	"github.com/vaughnbosu/cws-cli/internal/output"
+	"github.com/vaughnbosu/cws-cli/pkg/service"
 )
 
 var rolloutCmd = &cobra.Command{
@@ -34,45 +34,22 @@ func runRollout(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	ctx := context.Background()
 
-	output.Info("Setting deploy percentage to %d%% for extension %s...", percentage, actx.extensionID)
+	output.Info("Setting deploy percentage to %d%% for extension %s...", percentage, actx.ExtensionID)
 
-	if err := actx.client.SetDeployPercentage(ctx, actx.extensionID, percentage); err != nil {
+	result, err := service.SetRollout(context.Background(), actx, percentage)
+	if err != nil {
 		return err
 	}
 
-	// Confirm against a fresh status read. The value may lag briefly after the
-	// write, so only claim the live value when it matches the request.
-	confirmed := -1
-	if status, _, err := actx.client.FetchStatus(ctx, actx.extensionID); err == nil {
-		confirmed = publishedDeployPercentage(status)
-	}
-
-	if confirmed == percentage {
+	if result.Confirmed {
 		output.Info("Deploy percentage set to %d%%.", percentage)
 	} else {
 		output.Info("Deploy percentage update accepted. Run 'cws status' to confirm the live value.")
 	}
 
 	if output.JSONMode() {
-		return output.EmitJSON(map[string]any{
-			"requested": percentage,
-			"confirmed": confirmed == percentage,
-		})
+		return output.EmitJSON(result)
 	}
 	return nil
-}
-
-func publishedDeployPercentage(status *api.StatusResponse) int {
-	if status == nil || status.PublishedItemRevisionStatus == nil {
-		return -1
-	}
-
-	channels := status.PublishedItemRevisionStatus.DistributionChannels
-	if len(channels) == 0 {
-		return -1
-	}
-
-	return channels[0].DeployPercentage
 }

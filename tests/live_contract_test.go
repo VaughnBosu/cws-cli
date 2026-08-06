@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/vaughnbosu/cws-cli/internal/api"
-	"github.com/vaughnbosu/cws-cli/internal/auth"
+	"github.com/vaughnbosu/cws-cli/pkg/api"
+	"github.com/vaughnbosu/cws-cli/pkg/auth"
 )
 
 const chromeWebStoreDiscoveryURL = "https://chromewebstore.googleapis.com/$discovery/rest?version=v2"

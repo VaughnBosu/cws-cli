@@ -2,17 +2,13 @@ package cmd
 
 import (
 	"context"
-	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
-	"time"
+	"errors"
 
 	"github.com/spf13/cobra"
-	"github.com/vaughnbosu/cws-cli/internal/api"
-	"github.com/vaughnbosu/cws-cli/internal/config"
 	"github.com/vaughnbosu/cws-cli/internal/output"
-	cwszip "github.com/vaughnbosu/cws-cli/internal/zip"
+	"github.com/vaughnbosu/cws-cli/pkg/api"
+	"github.com/vaughnbosu/cws-cli/pkg/config"
+	"github.com/vaughnbosu/cws-cli/pkg/service"
 )
 
 var uploadCmd = &cobra.Command{
@@ -36,15 +32,6 @@ func init() {
 	rootCmd.AddCommand(uploadCmd)
 }
 
-// uploadResult is the machine-readable output of cws upload.
-type uploadResult struct {
-	ItemID       string `json:"itemId,omitempty"`
-	CrxVersion   string `json:"crxVersion,omitempty"`
-	UploadState  string `json:"uploadState"`
-	Published    bool   `json:"published,omitempty"`
-	PublishState string `json:"publishState,omitempty"`
-}
-
 func runUpload(cmd *cobra.Command, args []string) error {
 	actx, err := newAPIContext(cmd)
 	if err != nil {
@@ -60,203 +47,67 @@ func runUpload(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		source = args[0]
 	} else {
-		source = config.ResolveSource("", actx.extName, actx.cfg)
+		source = config.ResolveSource("", actx.Profile, actx.Config)
 	}
 
-	// Pre-upload validation (builds the zip once; reused for upload)
-	var zipData []byte
 	if !skipValidate {
 		output.Info("Validating...")
-		results, validatedZip := runValidationChecks(cmd, actx.cfg, source, false)
-		failures := 0
-		for _, r := range results {
-			if !r.Passed {
-				output.Info("  x %s", r.Message)
-				failures++
-			}
-		}
-		if failures > 0 {
-			output.Hint("To upload without validation, use --skip-validate")
-			return fmt.Errorf("cws validate failed: %d issue(s) found", failures)
-		}
-		output.Info("Validation passed!")
-		output.Info("")
-		zipData = validatedZip
+	}
+	output.Info("Uploading to extension %s...", actx.ExtensionID)
+	if publish {
+		output.Info("Publishing...")
 	}
 
-	if zipData == nil {
-		zipData, err = prepareZip(source, actx.cfg.Package)
-		if err != nil {
-			return err
-		}
-	}
-
-	ctx := context.Background()
-
-	// Upload
-	output.Info("Uploading to extension %s...", actx.extensionID)
-	resp, err := actx.client.Upload(ctx, actx.extensionID, zipData)
+	result, err := service.Upload(context.Background(), actx, service.UploadOptions{
+		Source:       source,
+		Wait:         wait,
+		TimeoutSec:   timeout,
+		Publish:      publish,
+		SkipValidate: skipValidate,
+	})
 	if err != nil {
+		var valErr *service.ValidationError
+		if errors.As(err, &valErr) {
+			for _, check := range valErr.Result.Checks {
+				if !check.Passed {
+					output.Info("  x %s", check.Message)
+				}
+			}
+			output.Hint("To upload without validation, use --skip-validate")
+		}
 		return err
 	}
 
-	output.Info("Upload state: %s", resp.UploadState)
-
-	// Wait for processing
-	if wait && api.IsUploadInProgress(resp.UploadState) {
-		resp, err = waitForUpload(ctx, actx.client, actx.extensionID, timeout)
-		if err != nil {
-			return err
-		}
+	if !skipValidate {
+		output.Info("Validation passed!")
+		output.Info("")
 	}
 
-	if api.IsUploadFailed(resp.UploadState) {
-		return &api.CWSError{
-			Operation: "upload",
-			Message:   "upload processing failed. The v2 API does not return failure details",
-			Hint:      "Check the item in the developer dashboard for the specific error: https://chrome.google.com/webstore/devconsole",
-		}
-	}
+	output.Info("Upload state: %s", result.UploadState)
 
-	if api.IsUploadInProgress(resp.UploadState) {
+	if api.IsUploadInProgress(result.UploadState) {
 		output.Info("Upload is still processing. Use 'cws status' to check progress.")
-		return emitUploadJSON(resp, false, "")
+		return emitUploadJSON(result)
 	}
 
-	if !api.IsUploadSucceeded(resp.UploadState) {
-		return fmt.Errorf("upload finished in unexpected state %q. Run 'cws status' to check the item, or upload again", resp.UploadState)
-	}
-
-	if resp.CrxVersion != "" {
-		output.Info("Upload successful! (version %s)", resp.CrxVersion)
+	if result.CrxVersion != "" {
+		output.Info("Upload successful! (version %s)", result.CrxVersion)
 	} else {
 		output.Info("Upload successful!")
 	}
 
-	// Auto-publish
-	publishState := ""
-	if publish {
-		output.Info("Publishing...")
-		pubResp, err := actx.client.Publish(ctx, actx.extensionID, api.PublishOptions{})
-		if err != nil {
-			return fmt.Errorf("upload succeeded but publish failed: %w", err)
-		}
-		printPublishWarnings(pubResp)
-		publishState = pubResp.State
-		if pubResp.State != "" {
-			output.Info("Publish state: %s", FormatState(pubResp.State))
-		} else {
-			output.Info("Publish submitted successfully.")
-		}
+	if publish && result.PublishState != "" {
+		output.Info("Publish state: %s", service.FormatState(result.PublishState))
+	} else if publish {
+		output.Info("Publish submitted successfully.")
 	}
 
-	return emitUploadJSON(resp, publish, publishState)
+	return emitUploadJSON(result)
 }
 
-func emitUploadJSON(resp *api.UploadResponse, published bool, publishState string) error {
+func emitUploadJSON(result *service.UploadResult) error {
 	if !output.JSONMode() {
 		return nil
 	}
-	return output.EmitJSON(uploadResult{
-		ItemID:       resp.ItemID,
-		CrxVersion:   resp.CrxVersion,
-		UploadState:  resp.UploadState,
-		Published:    published,
-		PublishState: publishState,
-	})
-}
-
-// prepareZip turns a source (directory, .zip, or .crx) into uploadable zip bytes.
-func prepareZip(source string, pkg config.PackageConfig) ([]byte, error) {
-	absSource, err := filepath.Abs(source)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve source path: %w", err)
-	}
-
-	info, err := os.Stat(absSource)
-	if err != nil {
-		return nil, fmt.Errorf("source not found: %s", source)
-	}
-
-	if !info.IsDir() {
-		// It's a file — read it directly (.zip or .crx)
-		ext := strings.ToLower(filepath.Ext(absSource))
-		if ext != ".zip" && ext != ".crx" {
-			return nil, fmt.Errorf("source file must be a .zip or .crx file, got: %s", ext)
-		}
-
-		data, err := os.ReadFile(absSource)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read source file: %w", err)
-		}
-
-		if ext == ".crx" {
-			// The upload endpoint only accepts raw zips; unwrap the CRX header.
-			data, err = cwszip.ExtractZipFromCRX(data)
-			if err != nil {
-				return nil, fmt.Errorf("failed to extract zip from CRX: %w", err)
-			}
-		}
-
-		hasManifest, err := cwszip.ContainsManifestInZip(data)
-		if err != nil {
-			return nil, err
-		}
-		if !hasManifest {
-			return nil, fmt.Errorf("package does not contain a manifest.json")
-		}
-
-		return data, nil
-	}
-
-	// Directory — validate and zip
-	if !cwszip.ContainsManifest(absSource) {
-		return nil, fmt.Errorf("directory does not contain a manifest.json: %s", source)
-	}
-
-	output.Info("Zipping directory %s...", source)
-	data, err := cwszip.ZipDirectoryWithOptions(absSource, zipOptions(pkg))
-	if err != nil {
-		return nil, err
-	}
-	output.Info("Created zip (%d bytes)", len(data))
-
-	return data, nil
-}
-
-// zipOptions converts config package settings to zip options.
-func zipOptions(pkg config.PackageConfig) cwszip.Options {
-	return cwszip.Options{
-		Exclude: pkg.Exclude,
-		Include: pkg.Include,
-	}
-}
-
-func waitForUpload(ctx context.Context, client *api.Client, extensionID string, timeoutSec int) (*api.UploadResponse, error) {
-	deadline := time.Now().Add(time.Duration(timeoutSec) * time.Second)
-	pollInterval := 5 * time.Second
-
-	output.Progress("Waiting for upload to process")
-
-	for time.Now().Before(deadline) {
-		time.Sleep(pollInterval)
-		output.Progress(".")
-
-		status, _, err := client.FetchStatus(ctx, extensionID)
-		if err != nil {
-			return nil, err
-		}
-
-		if !api.IsUploadInProgress(status.LastAsyncUploadState) {
-			output.Progress("\n")
-			return &api.UploadResponse{
-				ItemID:      status.ItemID,
-				CrxVersion:  status.SubmittedItemRevisionStatus.Version(),
-				UploadState: status.LastAsyncUploadState,
-			}, nil
-		}
-	}
-
-	output.Progress("\n")
-	return nil, fmt.Errorf("timed out waiting for upload processing after %d seconds", timeoutSec)
+	return output.EmitJSON(result)
 }

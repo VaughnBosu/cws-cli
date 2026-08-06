@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/vaughnbosu/cws-cli/cmd"
-	"github.com/vaughnbosu/cws-cli/internal/config"
+	"github.com/vaughnbosu/cws-cli/pkg/config"
 )
 
 // Regression test: cws login must update only refresh_token, not rewrite the

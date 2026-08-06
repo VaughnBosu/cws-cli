@@ -5,8 +5,9 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/vaughnbosu/cws-cli/internal/api"
 	"github.com/vaughnbosu/cws-cli/internal/output"
+	"github.com/vaughnbosu/cws-cli/pkg/api"
+	"github.com/vaughnbosu/cws-cli/pkg/service"
 )
 
 var statusCmd = &cobra.Command{
@@ -24,9 +25,8 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	ctx := context.Background()
 
-	resp, rawJSON, err := actx.client.FetchStatus(ctx, actx.extensionID)
+	resp, rawJSON, err := service.GetStatus(context.Background(), actx)
 	if err != nil {
 		return err
 	}
@@ -36,10 +36,8 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// Formatted output
-	output.Info("Extension: %s", actx.extensionID)
+	output.Info("Extension: %s", actx.ExtensionID)
 
-	// Policy flags first — these are the most urgent facts about an item.
 	if resp.TakenDown {
 		output.Warn("This extension has been TAKEN DOWN for a policy violation. Check the developer dashboard: https://chrome.google.com/webstore/devconsole")
 	}
@@ -67,7 +65,7 @@ func printRevision(label string, rev *api.ItemRevisionStatus) {
 	}
 	output.Info("")
 	output.Info("%s:", label)
-	output.Info("  State:   %s", FormatState(rev.State))
+	output.Info("  State:   %s", service.FormatState(rev.State))
 	if rev.CrxVersion != "" {
 		output.Info("  Version: %s", rev.CrxVersion)
 	}
@@ -76,27 +74,5 @@ func printRevision(label string, rev *api.ItemRevisionStatus) {
 			output.Info("  Version: %s", ch.CrxVersion)
 		}
 		output.Info("  Deploy:  %d%%", ch.DeployPercentage)
-	}
-}
-
-// FormatState converts an API state string to a human-readable label.
-func FormatState(state string) string {
-	switch state {
-	case "PUBLISHED":
-		return "Published"
-	case "PENDING_REVIEW":
-		return "Pending Review"
-	case "STAGED":
-		return "Staged"
-	case "PUBLISHED_TO_TESTERS":
-		return "Published to Testers"
-	case "REJECTED":
-		return "Rejected"
-	case "CANCELLED":
-		return "Cancelled"
-	case "ITEM_STATE_UNSPECIFIED":
-		return "Unknown"
-	default:
-		return state
 	}
 }

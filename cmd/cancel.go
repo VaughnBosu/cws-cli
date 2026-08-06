@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/vaughnbosu/cws-cli/internal/output"
+	"github.com/vaughnbosu/cws-cli/pkg/service"
 )
 
 var cancelCmd = &cobra.Command{
@@ -23,17 +24,17 @@ func runCancel(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	ctx := context.Background()
 
-	output.Info("Cancelling submission for extension %s...", actx.extensionID)
+	output.Info("Cancelling submission for extension %s...", actx.ExtensionID)
 
-	if err := actx.client.CancelSubmission(ctx, actx.extensionID); err != nil {
+	result, err := service.CancelSubmission(context.Background(), actx)
+	if err != nil {
 		return err
 	}
 
 	output.Info("Submission cancelled successfully.")
 	if output.JSONMode() {
-		return output.EmitJSON(map[string]any{"cancelled": true})
+		return output.EmitJSON(result)
 	}
 	return nil
 }
