@@ -1,471 +1,673 @@
-<!DOCTYPE html>
-<html lang="en" class="scroll-smooth">
+<!doctype html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>cws — Chrome Web Store CLI</title>
-  <meta name="description" content="A single-binary CLI for managing Chrome Web Store extensions. Upload, publish, rollout, and more — from your Terminal.">
-  <meta name="keywords" content="chrome web store, cli, chrome extension, publish, upload, devtools, go">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>cws — Chrome Web Store toolkit</title>
+  <meta name="description" content="Ship Chrome extensions from your terminal, CI pipeline, or AI client with the cws CLI and MCP server.">
+  <meta name="keywords" content="Chrome Web Store, CLI, MCP, Chrome extension, publish, upload, automation">
   <meta name="author" content="vaughnbosu">
-
-  <meta property="og:title" content="cws — Chrome Web Store CLI">
-  <meta property="og:description" content="A single-binary CLI for managing Chrome Web Store extensions. Upload, publish, rollout, and more — from your Terminal.">
+  <link rel="canonical" href="https://vaughnbosu.github.io/cws-cli/">
+  <meta property="og:title" content="cws — Chrome Web Store toolkit">
+  <meta property="og:description" content="One reliable workflow for terminal, CI, and AI-assisted Chrome Web Store releases.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://vaughnbosu.github.io/cws-cli/">
-  <meta name="twitter:card" content="summary_large_image">
-
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'media',
-      theme: {
-        extend: {
-          fontFamily: {
-            sans: ['Inter', 'system-ui', 'sans-serif'],
-          },
-        },
-      },
-    }
-  </script>
-
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-
+  <meta name="twitter:card" content="summary">
   <style>
-    [data-copy] { cursor: pointer; }
-    .fade-in { animation: fadeIn 0.5s ease-out; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    :root {
+      color-scheme: light dark;
+      --bg: #f7f8fa;
+      --surface: #ffffff;
+      --surface-alt: #f0f2f5;
+      --ink: #15171a;
+      --muted: #62666d;
+      --line: #dfe2e7;
+      --line-strong: #c8ccd3;
+      --code: #111317;
+      --code-ink: #f3f4f6;
+      --blue: #1a73e8;
+      --blue-soft: #e8f0fe;
+      --green: #188038;
+      --green-soft: #e6f4ea;
+      --yellow: #f9ab00;
+      --red: #d93025;
+      --shadow: 0 18px 50px rgba(28, 32, 38, .08);
+      --radius: 18px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      --sans: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #101114;
+        --surface: #17191d;
+        --surface-alt: #202328;
+        --ink: #f1f3f4;
+        --muted: #a9adb5;
+        --line: #2f333a;
+        --line-strong: #444951;
+        --code: #0b0c0e;
+        --blue: #8ab4f8;
+        --blue-soft: #233044;
+        --green: #81c995;
+        --green-soft: #20372a;
+        --shadow: 0 18px 50px rgba(0, 0, 0, .24);
+      }
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      overflow-x: clip;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--sans);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0 0 auto;
+      z-index: 100;
+      height: 4px;
+      background: linear-gradient(90deg, #4285f4 0 25%, #ea4335 25% 50%, #fbbc04 50% 75%, #34a853 75%);
+    }
+    a { color: inherit; }
+    button, input { font: inherit; }
+    code { font-family: var(--mono); }
+    [hidden] { display: none !important; }
+    :focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
+
+    .skip-link {
+      position: fixed;
+      top: -80px;
+      left: 18px;
+      z-index: 110;
+      padding: 10px 14px;
+      border-radius: 8px;
+      background: var(--ink);
+      color: var(--bg);
+      text-decoration: none;
+    }
+    .skip-link:focus { top: 12px; }
+    .wrap { width: min(1120px, calc(100% - 40px)); margin: 0 auto; }
+    .narrow { width: min(820px, calc(100% - 40px)); margin: 0 auto; }
+    .eyebrow {
+      margin: 0 0 12px;
+      color: var(--blue);
+      font: 700 12px/1 var(--mono);
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+    .section-heading { max-width: 680px; margin-bottom: 38px; }
+    .section-heading h2 {
+      margin: 0;
+      font-size: clamp(30px, 4vw, 46px);
+      line-height: 1.08;
+      letter-spacing: -.035em;
+    }
+    .section-heading p { margin: 14px 0 0; color: var(--muted); font-size: 17px; }
+    .subtle { color: var(--muted); }
+    .inline-code {
+      padding: 2px 6px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--surface-alt);
+      font-size: .84em;
+    }
+
+    .site-nav {
+      position: sticky;
+      top: 4px;
+      z-index: 50;
+      border-bottom: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
+      background: color-mix(in srgb, var(--bg) 88%, transparent);
+      backdrop-filter: blur(16px);
+    }
+    .nav-inner {
+      min-height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 28px;
+    }
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 780;
+      letter-spacing: -.03em;
+      text-decoration: none;
+    }
+    .brand-mark {
+      position: relative;
+      width: 30px;
+      height: 30px;
+      border: 1px solid var(--line-strong);
+      border-radius: 9px;
+      background: var(--surface);
+      box-shadow: 0 3px 10px rgba(0, 0, 0, .06);
+    }
+    .brand-mark::before {
+      content: ">_";
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      color: var(--blue);
+      font: 700 11px/1 var(--mono);
+    }
+    .nav-links { display: flex; align-items: center; gap: 24px; font-size: 14px; }
+    .nav-links a { color: var(--muted); text-decoration: none; }
+    .nav-links a:hover { color: var(--ink); }
+    .nav-github {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--ink) !important;
+      font-weight: 650;
+    }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      padding: 94px 0 78px;
+    }
+    .hero::after {
+      content: "";
+      position: absolute;
+      z-index: -1;
+      top: 48px;
+      left: calc(50% + 340px);
+      width: 320px;
+      height: 320px;
+      border: 70px solid var(--blue-soft);
+      border-radius: 50%;
+      opacity: .7;
+    }
+    .hero-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(360px, .95fr);
+      align-items: center;
+      gap: 74px;
+    }
+    .release-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
+    .release-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 6px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--surface);
+      color: var(--muted);
+      font: 600 12px/1 var(--mono);
+    }
+    .release-pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+    .hero h1 {
+      max-width: 720px;
+      margin: 0;
+      font-size: clamp(47px, 6.4vw, 76px);
+      line-height: .98;
+      letter-spacing: -.055em;
+    }
+    .hero-copy { max-width: 650px; margin: 24px 0 0; color: var(--muted); font-size: 19px; }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 32px; }
+    .button {
+      display: inline-flex;
+      min-height: 46px;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 0 18px;
+      border: 1px solid var(--line-strong);
+      border-radius: 10px;
+      background: var(--surface);
+      color: var(--ink);
+      font-weight: 680;
+      text-decoration: none;
+      transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+    }
+    .button:hover { transform: translateY(-1px); border-color: var(--blue); box-shadow: 0 8px 22px rgba(26, 115, 232, .12); }
+    .button.primary { border-color: var(--blue); background: var(--blue); color: #fff; }
+    @media (prefers-color-scheme: dark) { .button.primary { color: #101114; } }
+
+    .route-card {
+      position: relative;
+      padding: 26px;
+      border: 1px solid var(--line);
+      border-radius: 26px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    .route-label { margin-bottom: 18px; color: var(--muted); font: 650 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+    .route-source {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .route-node {
+      padding: 15px;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      background: var(--surface-alt);
+    }
+    .route-node strong { display: block; font-size: 14px; }
+    .route-node span { display: block; margin-top: 3px; color: var(--muted); font-size: 12px; }
+    .route-lines {
+      width: 52%;
+      height: 34px;
+      margin: 0 auto;
+      border-right: 1px solid var(--line-strong);
+      border-bottom: 1px solid var(--line-strong);
+      border-left: 1px solid var(--line-strong);
+      border-radius: 0 0 12px 12px;
+    }
+    .route-core {
+      position: relative;
+      margin-top: 13px;
+      padding: 19px;
+      border: 1px solid color-mix(in srgb, var(--blue) 35%, var(--line));
+      border-radius: 15px;
+      background: var(--blue-soft);
+    }
+    .route-core::before { content: ""; position: absolute; top: -14px; left: 50%; height: 14px; border-left: 1px solid var(--line-strong); }
+    .route-core strong { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .route-core small { display: block; margin-top: 4px; color: var(--muted); }
+    .api-badge { padding: 4px 7px; border-radius: 6px; background: var(--surface); color: var(--blue); font: 700 11px/1 var(--mono); }
+    .route-target { display: flex; align-items: center; gap: 10px; margin-top: 14px; color: var(--muted); font-size: 13px; }
+    .route-target::before { content: "↓"; color: var(--green); font-size: 18px; }
+
+    .signal-bar { border-block: 1px solid var(--line); background: var(--surface); }
+    .signals { display: grid; grid-template-columns: repeat(4, 1fr); }
+    .signal { padding: 24px; border-left: 1px solid var(--line); }
+    .signal:first-child { border-left: 0; }
+    .signal strong { display: block; font-size: 16px; }
+    .signal span { color: var(--muted); font-size: 13px; }
+
+    section.content { padding: 96px 0; scroll-margin-top: 64px; }
+    .tint { border-block: 1px solid var(--line); background: var(--surface); }
+    .product-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .product-grid > *, .setup-grid > *, .split > *, .config-grid > * { min-width: 0; }
+    .product-card {
+      position: relative;
+      overflow: hidden;
+      padding: 30px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
+    .product-card::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--blue); }
+    .product-card.mcp::before { background: var(--green); }
+    .product-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .product-tag { color: var(--blue); font: 700 12px/1 var(--mono); }
+    .mcp .product-tag { color: var(--green); }
+    .product-card h3 { margin: 17px 0 8px; font-size: 25px; letter-spacing: -.025em; }
+    .product-card p { margin: 0; color: var(--muted); }
+    .best-for { display: flex; flex-wrap: wrap; gap: 7px; margin: 22px 0; }
+    .best-for span { padding: 5px 9px; border-radius: 999px; background: var(--surface-alt); color: var(--muted); font-size: 12px; }
+    .text-link { color: var(--blue); font-weight: 680; text-decoration: none; }
+    .text-link:hover { text-decoration: underline; }
+
+    .setup-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .step-card { padding: 24px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+    .step-number { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 9px; background: var(--ink); color: var(--bg); font: 700 12px/1 var(--mono); }
+    .step-card h3 { margin: 18px 0 8px; font-size: 17px; }
+    .step-card p { margin: 0 0 16px; color: var(--muted); font-size: 14px; }
+
+    .snippet { position: relative; margin: 0; }
+    .snippet pre {
+      margin: 0;
+      padding: 20px 54px 20px 20px;
+      overflow: auto;
+      border: 1px solid #272b31;
+      border-radius: 13px;
+      background: var(--code);
+      color: var(--code-ink);
+      font: 13px/1.65 var(--mono);
+      tab-size: 2;
+    }
+    .snippet.compact pre { padding-block: 14px; white-space: pre; }
+    .copy-button {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 2;
+      padding: 5px 8px;
+      border: 1px solid #343941;
+      border-radius: 7px;
+      background: #1c1f24;
+      color: #aeb4bd;
+      cursor: pointer;
+      font: 650 11px/1 var(--sans);
+    }
+    .copy-button:hover { border-color: #5c6470; color: #fff; }
+    .copy-button.copied { border-color: #377d4c; color: #81c995; }
+    .comment { color: #7f8792; }
+
+    .split { display: grid; grid-template-columns: .78fr 1.22fr; align-items: start; gap: 74px; }
+    .split.reverse { grid-template-columns: 1.15fr .85fr; }
+    .sticky-copy { position: sticky; top: 104px; }
+    .sticky-copy h2 { margin: 0; font-size: clamp(34px, 4vw, 50px); line-height: 1.05; letter-spacing: -.04em; }
+    .sticky-copy > p:not(.eyebrow) { color: var(--muted); }
+    .version-link { display: inline-flex; margin-top: 14px; color: var(--blue); font: 650 13px/1 var(--mono); text-decoration: none; }
+    .version-link:hover { text-decoration: underline; }
+    .panel-stack { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; gap: 18px; }
+    .panel { min-width: 0; padding: 24px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+    .panel h3 { margin: 0 0 6px; font-size: 18px; }
+    .panel > p { margin: 0 0 18px; color: var(--muted); font-size: 14px; }
+    .command-list { width: 100%; table-layout: fixed; border-collapse: collapse; }
+    .command-list tr { border-top: 1px solid var(--line); }
+    .command-list tr:first-child { border-top: 0; }
+    .command-list td { padding: 11px 0; vertical-align: top; font-size: 14px; }
+    .command-list td:first-child { width: 45%; padding-right: 16px; overflow-wrap: anywhere; color: var(--ink); font-family: var(--mono); font-size: 12px; }
+    .command-list td:last-child { color: var(--muted); }
+    details { border-top: 1px solid var(--line); }
+    details:first-of-type { border-top: 0; }
+    summary { padding: 15px 0; cursor: pointer; font-weight: 680; }
+    details p { color: var(--muted); font-size: 14px; }
+    details .snippet { margin-bottom: 16px; }
+
+    .tabs { min-width: 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); overflow: hidden; }
+    .tab-list { display: flex; gap: 4px; padding: 8px; overflow-x: auto; border-bottom: 1px solid var(--line); background: var(--surface-alt); }
+    .tab-button {
+      flex: 0 0 auto;
+      padding: 8px 12px;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 650;
+    }
+    .tab-button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 4px rgba(0, 0, 0, .08); }
+    .tab-panel { padding: 24px; }
+    .tab-panel h3 { margin: 0 0 6px; }
+    .tab-panel > p { margin: 0 0 18px; color: var(--muted); font-size: 14px; }
+
+    .safety-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 18px; }
+    .safety-card { padding: 18px; border: 1px solid var(--line); border-radius: 13px; background: var(--surface-alt); }
+    .safety-card strong { display: block; margin-bottom: 6px; }
+    .safety-card p { margin: 0; color: var(--muted); font-size: 13px; }
+    .dot { display: inline-block; width: 8px; height: 8px; margin-right: 7px; border-radius: 50%; background: var(--green); }
+    .dot.write { background: var(--yellow); }
+
+    .config-grid { display: grid; grid-template-columns: 1.05fr .95fr; gap: 20px; }
+    .config-card { padding: 26px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+    .config-card h3 { margin: 0 0 8px; }
+    .config-card > p { margin: 0 0 20px; color: var(--muted); font-size: 14px; }
+    .priority { margin: 0; padding: 0; list-style: none; counter-reset: priority; }
+    .priority li { display: flex; gap: 12px; padding: 11px 0; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+    .priority li::before { counter-increment: priority; content: counter(priority); color: var(--blue); font: 700 12px/1.9 var(--mono); }
+    .env-list { margin: 0; display: grid; gap: 9px; }
+    .env-list div { display: grid; grid-template-columns: minmax(170px, .75fr) 1.25fr; gap: 12px; }
+    .env-list dt { font: 12px/1.6 var(--mono); }
+    .env-list dd { margin: 0; color: var(--muted); font-size: 13px; }
+
+    .callout {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 28px;
+      padding: 34px;
+      border: 1px solid color-mix(in srgb, var(--blue) 35%, var(--line));
+      border-radius: 22px;
+      background: var(--blue-soft);
+    }
+    .callout h2 { margin: 0 0 6px; font-size: 26px; letter-spacing: -.025em; }
+    .callout p { margin: 0; color: var(--muted); }
+    footer { padding: 32px 0; border-top: 1px solid var(--line); }
+    .footer-inner { display: flex; align-items: center; justify-content: space-between; gap: 22px; color: var(--muted); font-size: 13px; }
+    .footer-links { display: flex; flex-wrap: wrap; gap: 20px; }
+    .footer-links a { text-decoration: none; }
+    .footer-links a:hover { color: var(--ink); }
+
+    @media (max-width: 900px) {
+      .hero-grid, .split, .split.reverse, .config-grid { grid-template-columns: 1fr; gap: 44px; }
+      .hero-grid { max-width: 720px; }
+      .route-card { max-width: 560px; }
+      .sticky-copy { position: static; }
+      .split.reverse .sticky-copy { order: -1; }
+      .setup-grid { grid-template-columns: 1fr; }
+      .signals { grid-template-columns: 1fr 1fr; }
+      .signal:nth-child(3) { border-left: 0; border-top: 1px solid var(--line); }
+      .signal:nth-child(4) { border-top: 1px solid var(--line); }
+    }
+    @media (max-width: 680px) {
+      .wrap, .narrow { width: min(100% - 28px, 1120px); }
+      .nav-inner { width: calc(100% - 28px); min-width: 0; margin-inline: 14px; }
+      .nav-links { gap: 14px; }
+      .nav-links a:nth-child(1), .nav-links a:nth-child(4) { display: none; }
+      .hero { padding: 70px 0 58px; }
+      .hero h1 { font-size: clamp(42px, 14vw, 60px); }
+      .hero-copy { font-size: 17px; }
+      .product-grid, .safety-grid { grid-template-columns: 1fr; }
+      section.content { padding: 72px 0; }
+      .signal { padding: 18px 14px; }
+      .callout, .footer-inner { align-items: flex-start; flex-direction: column; }
+      .env-list div { grid-template-columns: 1fr; gap: 1px; }
+      .command-list td:first-child { width: 47%; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { transition: none !important; }
+    }
   </style>
 </head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
 
-<body class="bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans antialiased">
-
-  <!-- Nav -->
-  <nav class="sticky top-0 z-30 border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md">
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-      <a href="#" class="text-lg font-bold tracking-tight">cws</a>
-
-      <!-- Desktop links -->
-      <div class="hidden md:flex items-center gap-6 text-sm font-medium text-zinc-600 dark:text-zinc-400">
-        <a href="#features" class="hover:text-zinc-900 dark:hover:text-zinc-100 transition">Features</a>
-        <a href="#quickstart" class="hover:text-zinc-900 dark:hover:text-zinc-100 transition">Quick Start</a>
-        <a href="#commands" class="hover:text-zinc-900 dark:hover:text-zinc-100 transition">Commands</a>
-        <a href="#config" class="hover:text-zinc-900 dark:hover:text-zinc-100 transition">Config</a>
-        <a href="#cicd" class="hover:text-zinc-900 dark:hover:text-zinc-100 transition">CI/CD</a>
-        <a href="https://github.com/vaughnbosu/cws-cli" target="_blank" rel="noopener" class="hover:text-zinc-900 dark:hover:text-zinc-100 transition">GitHub</a>
-      </div>
-
-      <!-- Mobile menu button -->
-      <button id="mobile-toggle" class="md:hidden p-2 -mr-2 text-zinc-600 dark:text-zinc-400" aria-label="Toggle menu">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
-      </button>
-    </div>
-
-    <!-- Mobile menu -->
-    <div id="mobile-menu" class="hidden md:hidden border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
-      <div class="px-4 py-3 space-y-2 text-sm font-medium text-zinc-600 dark:text-zinc-400">
-        <a href="#features" class="block py-1 hover:text-zinc-900 dark:hover:text-zinc-100">Features</a>
-        <a href="#quickstart" class="block py-1 hover:text-zinc-900 dark:hover:text-zinc-100">Quick Start</a>
-        <a href="#commands" class="block py-1 hover:text-zinc-900 dark:hover:text-zinc-100">Commands</a>
-        <a href="#config" class="block py-1 hover:text-zinc-900 dark:hover:text-zinc-100">Config</a>
-        <a href="#cicd" class="block py-1 hover:text-zinc-900 dark:hover:text-zinc-100">CI/CD</a>
-        <a href="https://github.com/vaughnbosu/cws-cli" target="_blank" rel="noopener" class="block py-1 hover:text-zinc-900 dark:hover:text-zinc-100">GitHub</a>
+  <nav class="site-nav" aria-label="Primary navigation">
+    <div class="wrap nav-inner">
+      <a class="brand" href="./" aria-label="cws home">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span>cws toolkit</span>
+      </a>
+      <div class="nav-links">
+        <a href="#setup">Setup</a>
+        <a href="#cli">CLI</a>
+        <a href="#mcp">MCP</a>
+        <a href="#config">Config</a>
+        <a class="nav-github" href="https://github.com/vaughnbosu/cws-cli" target="_blank" rel="noopener">
+          GitHub <span aria-hidden="true">↗</span>
+        </a>
       </div>
     </div>
   </nav>
 
-  <!-- Hero -->
-  <section class="max-w-3xl mx-auto px-4 sm:px-6 pt-20 pb-16 text-center fade-in">
-    <h1 class="text-4xl sm:text-5xl font-bold tracking-tight leading-tight">Chrome Web Store<br>from your Terminal</h1>
-    <p class="mt-4 text-lg text-zinc-600 dark:text-zinc-400 max-w-xl mx-auto">Upload, publish, rollout, and manage Chrome extensions — a fast, lightweight, CLI powered by the latest V2 API.</p>
-
-    <div class="mt-8 flex flex-col items-center justify-center gap-3">
-      <div class="flex flex-col sm:flex-row items-center justify-center gap-3 w-full sm:w-auto">
-        <div class="relative w-full sm:w-auto">
-          <div class="bg-zinc-900 dark:bg-zinc-800 text-zinc-100 rounded-lg px-4 py-3 pr-12 text-sm font-mono text-left whitespace-nowrap overflow-x-auto">brew install --cask vaughnbosu/tap/cws</div>
-          <button data-copy="brew install --cask vaughnbosu/tap/cws" class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded hover:bg-zinc-700 transition text-zinc-400 hover:text-zinc-200" title="Copy">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" stroke-width="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke-width="2"/></svg>
-          </button>
-        </div>
-        <a href="https://github.com/vaughnbosu/cws-cli" target="_blank" rel="noopener" class="inline-flex items-center gap-2 rounded-lg border border-zinc-300 dark:border-zinc-700 px-4 py-3 text-sm font-medium hover:bg-zinc-50 dark:hover:bg-zinc-900 transition">
-          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-          GitHub
-        </a>
-      </div>
-      <p class="text-xs text-zinc-400 dark:text-zinc-500">or <code class="bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">curl -fsSL https://vaughnbosu.github.io/cws-cli/install.sh | bash</code></p>
-    </div>
-  </section>
-
-  <!-- Stats -->
-  <section class="border-y border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
-    <div class="max-w-4xl mx-auto px-4 sm:px-6 py-8 grid grid-cols-2 sm:grid-cols-4 gap-6 text-center">
-      <div>
-        <div class="text-2xl font-bold">V2</div>
-        <div class="text-sm text-zinc-500 dark:text-zinc-400 mt-1">API Version</div>
-      </div>
-      <div>
-        <div class="text-2xl font-bold">8</div>
-        <div class="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Commands</div>
-      </div>
-      <div>
-        <div class="text-2xl font-bold">1</div>
-        <div class="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Binary</div>
-      </div>
-      <div>
-        <div class="text-2xl font-bold">0</div>
-        <div class="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Dependencies</div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Features -->
-  <section id="features" class="max-w-6xl mx-auto px-4 sm:px-6 py-20">
-    <h2 class="text-2xl sm:text-3xl font-bold text-center">Why cws?</h2>
-    <p class="mt-3 text-center text-zinc-500 dark:text-zinc-400 max-w-xl mx-auto">Everything you need to manage Chrome Web Store extensions, nothing you don't.</p>
-
-    <div class="mt-12 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-
-      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-5 hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-sm transition">
-        <div class="text-sm font-semibold">Single Binary</div>
-        <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">No runtime, no <code class="text-xs bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">npm install</code>, no dependencies. Download and run.</p>
-      </div>
-
-      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-5 hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-sm transition">
-        <div class="text-sm font-semibold">V2 API</div>
-        <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">Built directly on the current Chrome Web Store API.</p>
-      </div>
-
-      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-5 hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-sm transition">
-        <div class="text-sm font-semibold">Interactive Setup</div>
-        <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400"><code class="text-xs bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">cws init --global</code> walks you through OAuth config — no more copy-pasting env vars from docs.</p>
-      </div>
-
-      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-5 hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-sm transition">
-        <div class="text-sm font-semibold">Full Lifecycle</div>
-        <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">Upload, publish, status, staged rollouts, and submission cancellation — all from one tool.</p>
-      </div>
-
-      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-5 hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-sm transition">
-        <div class="text-sm font-semibold">CI/CD Ready</div>
-        <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">Env vars, meaningful exit codes, and zero dependencies means it drops into any pipeline.</p>
-      </div>
-
-      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-5 hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-sm transition">
-        <div class="text-sm font-semibold">Flexible Config</div>
-        <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">TOML file, env vars, CLI flags — use any combination. Local or global config, your choice.</p>
-      </div>
-
-    </div>
-  </section>
-
-  <!-- Quick Start -->
-  <section id="quickstart" class="border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
-    <div class="max-w-3xl mx-auto px-4 sm:px-6 py-20">
-      <h2 class="text-2xl sm:text-3xl font-bold text-center">Quick Start</h2>
-      <p class="mt-3 text-center text-zinc-500 dark:text-zinc-400">Three steps to publish your extension.</p>
-
-      <div class="mt-12 space-y-8">
-
-        <!-- Step 1 -->
+  <main id="main">
+    <header class="hero" id="top">
+      <div class="wrap hero-grid">
         <div>
-          <div class="flex items-center gap-3 mb-3">
-            <span class="flex items-center justify-center w-7 h-7 rounded-full bg-zinc-900 dark:bg-zinc-100 text-zinc-100 dark:text-zinc-900 text-xs font-bold">1</span>
-            <h3 class="font-semibold">Set up credentials</h3>
+          <div class="release-row" aria-label="Current releases">
+            <span class="release-pill">CLI v1.3.1</span>
+            <span class="release-pill">MCP v1.0.0</span>
           </div>
-          <div class="relative">
-            <pre class="bg-zinc-900 dark:bg-zinc-800 text-zinc-100 rounded-lg p-4 text-sm font-mono overflow-x-auto"><code>cws init --global</code></pre>
-            <button data-copy="cws init --global" class="absolute right-2 top-2 p-1.5 rounded hover:bg-zinc-700 transition text-zinc-400 hover:text-zinc-200" title="Copy">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" stroke-width="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke-width="2"/></svg>
-            </button>
-          </div>
-          <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">Interactive wizard that stores OAuth2 credentials, refresh token, and Publisher ID in your global config.</p>
-        </div>
-
-        <!-- Step 2 -->
-        <div>
-          <div class="flex items-center gap-3 mb-3">
-            <span class="flex items-center justify-center w-7 h-7 rounded-full bg-zinc-900 dark:bg-zinc-100 text-zinc-100 dark:text-zinc-900 text-xs font-bold">2</span>
-            <h3 class="font-semibold">Upload your extension</h3>
-          </div>
-          <div class="relative">
-            <pre class="bg-zinc-900 dark:bg-zinc-800 text-zinc-100 rounded-lg p-4 text-sm font-mono overflow-x-auto"><code>cws upload ./dist</code></pre>
-            <button data-copy="cws upload ./dist" class="absolute right-2 top-2 p-1.5 rounded hover:bg-zinc-700 transition text-zinc-400 hover:text-zinc-200" title="Copy">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" stroke-width="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke-width="2"/></svg>
-            </button>
-          </div>
-          <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">Zips the directory (excluding <code class="text-xs bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">.git/</code>, <code class="text-xs bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">node_modules/</code>, etc.) and uploads it.</p>
-        </div>
-
-        <!-- Step 3 -->
-        <div>
-          <div class="flex items-center gap-3 mb-3">
-            <span class="flex items-center justify-center w-7 h-7 rounded-full bg-zinc-900 dark:bg-zinc-100 text-zinc-100 dark:text-zinc-900 text-xs font-bold">3</span>
-            <h3 class="font-semibold">Publish</h3>
-          </div>
-          <div class="relative">
-            <pre class="bg-zinc-900 dark:bg-zinc-800 text-zinc-100 rounded-lg p-4 text-sm font-mono overflow-x-auto"><code>cws publish</code></pre>
-            <button data-copy="cws publish" class="absolute right-2 top-2 p-1.5 rounded hover:bg-zinc-700 transition text-zinc-400 hover:text-zinc-200" title="Copy">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" stroke-width="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke-width="2"/></svg>
-            </button>
+          <h1>Ship Chrome extensions your way.</h1>
+          <p class="hero-copy">One reliable Chrome Web Store workflow for your terminal, CI pipeline, or AI client. Use the CLI directly or connect the MCP server to the tools you already work in.</p>
+          <div class="hero-actions">
+            <a class="button primary" href="#setup">Get started</a>
+            <a class="button" href="#mcp">Connect an AI client</a>
           </div>
         </div>
 
+        <div class="route-card" aria-label="Two interfaces share one Chrome Web Store service layer">
+          <div class="route-label">Choose your interface</div>
+          <div class="route-source">
+            <div class="route-node">
+              <strong>cws CLI</strong>
+              <span>Terminal + CI</span>
+            </div>
+            <div class="route-node">
+              <strong>cws MCP</strong>
+              <span>AI clients</span>
+            </div>
+          </div>
+          <div class="route-lines" aria-hidden="true"></div>
+          <div class="route-core">
+            <strong>Shared Go service <span class="api-badge">API v2</span></strong>
+            <small>One config, validation path, and release workflow</small>
+          </div>
+          <div class="route-target">Chrome Web Store publishing API</div>
+        </div>
       </div>
+    </header>
 
-      <!-- Prerequisites note -->
-      <div class="mt-12 rounded-lg border border-zinc-200 dark:border-zinc-800 p-5">
-        <div class="text-sm font-semibold mb-2">Prerequisites</div>
-        <p class="text-sm text-zinc-500 dark:text-zinc-400">Before using <code class="text-xs bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">cws</code>, set up API access in the Google Cloud Console. Follow the official <a href="https://developer.chrome.com/docs/webstore/using-api" target="_blank" rel="noopener" class="underline hover:text-zinc-900 dark:hover:text-zinc-100 transition">Chrome Web Store API guide</a>:</p>
-        <ol class="mt-3 space-y-1.5 text-sm text-zinc-500 dark:text-zinc-400 list-decimal list-inside">
-          <li>Create a project in the <a href="https://console.cloud.google.com/" target="_blank" rel="noopener" class="underline hover:text-zinc-900 dark:hover:text-zinc-100">Google Cloud Console</a></li>
-          <li>Enable the <strong class="text-zinc-700 dark:text-zinc-300">Chrome Web Store API</strong></li>
-          <li>Create an <strong class="text-zinc-700 dark:text-zinc-300">OAuth consent screen</strong></li>
-          <li>Create <strong class="text-zinc-700 dark:text-zinc-300">OAuth2 credentials</strong> (Desktop app type)</li>
-          <li>Generate a <strong class="text-zinc-700 dark:text-zinc-300">refresh token</strong> via the <a href="https://developers.google.com/oauthplayground" target="_blank" rel="noopener" class="underline hover:text-zinc-900 dark:hover:text-zinc-100">OAuth Playground</a></li>
-        </ol>
+    <div class="signal-bar" aria-label="Project highlights">
+      <div class="wrap signals">
+        <div class="signal"><strong>10 CLI commands</strong><span>Full release lifecycle</span></div>
+        <div class="signal"><strong>10 MCP tools</strong><span>Typed, guarded operations</span></div>
+        <div class="signal"><strong>One config</strong><span>Shared credentials + profiles</span></div>
+        <div class="signal"><strong>Open source</strong><span>MIT licensed Go projects</span></div>
       </div>
     </div>
-  </section>
 
-  <!-- Commands -->
-  <section id="commands" class="max-w-4xl mx-auto px-4 sm:px-6 py-20">
-    <h2 class="text-2xl sm:text-3xl font-bold text-center">Commands</h2>
-    <p class="mt-3 text-center text-zinc-500 dark:text-zinc-400 mb-12">Everything available in <code class="text-xs bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">cws help</code></p>
+    <section class="content" aria-labelledby="choose-title">
+      <div class="wrap">
+        <div class="section-heading">
+          <p class="eyebrow">Two interfaces, one toolkit</p>
+          <h2 id="choose-title">Use the workflow that fits the job.</h2>
+          <p>The MCP server uses the CLI’s service package under the hood, so moving between manual commands, automation, and agent-assisted work does not mean adopting a second release system.</p>
+        </div>
+        <div class="product-grid">
+          <article class="product-card">
+            <div class="product-meta"><span class="product-tag">cws-cli</span><span class="subtle">v1.3.1</span></div>
+            <h3>Direct and scriptable</h3>
+            <p>A single binary for local development and CI. Human-readable output by default, JSON when a pipeline needs it.</p>
+            <div class="best-for"><span>Terminal</span><span>GitHub Actions</span><span>Any CI</span></div>
+            <a class="text-link" href="#cli">Explore the CLI →</a>
+          </article>
+          <article class="product-card mcp">
+            <div class="product-meta"><span class="product-tag">cws-mcp</span><span class="subtle">v1.0.0</span></div>
+            <h3>Native to AI clients</h3>
+            <p>A local stdio MCP server for Codex, Claude, Cursor, VS Code, and Windsurf, with confirmation gates on store mutations.</p>
+            <div class="best-for"><span>Codex</span><span>Claude</span><span>Cursor</span><span>VS Code</span></div>
+            <a class="text-link" href="#mcp">Set up MCP →</a>
+          </article>
+        </div>
+      </div>
+    </section>
 
-    <!-- Command table -->
-    <div class="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
-      <table class="w-full text-sm">
-        <thead>
-          <tr class="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
-            <th class="text-left px-4 py-3 font-semibold">Command</th>
-            <th class="text-left px-4 py-3 font-semibold">Description</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-zinc-200 dark:divide-zinc-800">
-          <tr><td class="px-4 py-3 font-mono text-xs"><code>cws init [--global]</code></td><td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">Interactive credential setup wizard (browser sign-in)</td></tr>
-          <tr><td class="px-4 py-3 font-mono text-xs"><code>cws login</code></td><td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">Re-acquire a refresh token via browser sign-in</td></tr>
-          <tr><td class="px-4 py-3 font-mono text-xs"><code>cws validate [source]</code></td><td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">Pre-flight validation (manifest, version, icons, size, policy flags)</td></tr>
-          <tr><td class="px-4 py-3 font-mono text-xs"><code>cws pack [source]</code></td><td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">Zip an extension directory without uploading</td></tr>
-          <tr><td class="px-4 py-3 font-mono text-xs"><code>cws upload [source]</code></td><td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">Validate, zip, and upload a package</td></tr>
-          <tr><td class="px-4 py-3 font-mono text-xs"><code>cws publish</code></td><td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">Publish the latest uploaded version</td></tr>
-          <tr><td class="px-4 py-3 font-mono text-xs"><code>cws status</code></td><td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">Check extension status, policy warnings, and takedowns</td></tr>
-          <tr><td class="px-4 py-3 font-mono text-xs"><code>cws rollout &lt;pct&gt;</code></td><td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">Set deploy percentage (10k+ users required)</td></tr>
-          <tr><td class="px-4 py-3 font-mono text-xs"><code>cws cancel</code></td><td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">Cancel a pending submission</td></tr>
-          <tr><td class="px-4 py-3 font-mono text-xs"><code>cws version</code></td><td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">Print CLI version</td></tr>
-        </tbody>
-      </table>
-    </div>
+    <section class="content tint" id="setup" aria-labelledby="setup-title">
+      <div class="wrap">
+        <div class="section-heading">
+          <p class="eyebrow">Shared setup</p>
+          <h2 id="setup-title">Configure credentials once.</h2>
+          <p>The CLI creates the OAuth credentials used by both projects. Keep secrets in the global config and commit only extension settings to the project.</p>
+        </div>
+        <div class="setup-grid">
+          <article class="step-card">
+            <span class="step-number">1</span>
+            <h3>Install the CLI</h3>
+            <p>Homebrew installs the versioned binary release on macOS or Linux.</p>
+            <div class="snippet compact">
+              <button class="copy-button" type="button" data-copy-target="setup-install">Copy</button>
+              <pre><code id="setup-install">brew install --cask vaughnbosu/tap/cws</code></pre>
+            </div>
+          </article>
+          <article class="step-card">
+            <span class="step-number">2</span>
+            <h3>Create global credentials</h3>
+            <p>The browser-based flow saves secrets outside your repository.</p>
+            <div class="snippet compact">
+              <button class="copy-button" type="button" data-copy-target="setup-auth">Copy</button>
+              <pre><code id="setup-auth">cws init --global</code></pre>
+            </div>
+          </article>
+          <article class="step-card">
+            <span class="step-number">3</span>
+            <h3>Add the project profile</h3>
+            <p>Create <code class="inline-code">cws.toml</code> beside your extension source.</p>
+            <div class="snippet">
+              <button class="copy-button" type="button" data-copy-target="setup-config">Copy</button>
+              <pre><code id="setup-config">[extensions.default]
+id = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+source = "./dist"</code></pre>
+            </div>
+          </article>
+        </div>
+        <p class="subtle" style="margin: 22px 0 0; font-size: 14px;">Before setup, enable Chrome Web Store API access and create desktop OAuth credentials by following Google’s <a class="text-link" href="https://developer.chrome.com/docs/webstore/using-api" target="_blank" rel="noopener">official API guide</a>.</p>
+      </div>
+    </section>
 
-    <!-- Command details -->
-    <div class="mt-10 space-y-8">
-
-      <details class="group rounded-lg border border-zinc-200 dark:border-zinc-800">
-        <summary class="cursor-pointer px-5 py-4 flex items-center justify-between font-semibold text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition rounded-lg">
-          <span>cws validate</span>
-          <svg class="w-4 h-4 text-zinc-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-        </summary>
-        <div class="px-5 pb-5">
-          <pre class="bg-zinc-900 dark:bg-zinc-800 text-zinc-100 rounded-lg p-4 text-sm font-mono overflow-x-auto"><code><span class="text-zinc-500"># Full validation (local + remote checks)</span>
+    <section class="content" id="cli" aria-labelledby="cli-title">
+      <div class="wrap split">
+        <div class="sticky-copy">
+          <p class="eyebrow">cws CLI</p>
+          <h2 id="cli-title">From preflight to rollout.</h2>
+          <p>Validate locally, compare against the store, package cleanly, upload, publish, and inspect the result without leaving your terminal.</p>
+          <a class="version-link" href="https://github.com/vaughnbosu/cws-cli" target="_blank" rel="noopener">github.com/vaughnbosu/cws-cli ↗</a>
+        </div>
+        <div class="panel-stack">
+          <div class="panel">
+            <h3>A typical release</h3>
+            <p>Validation runs automatically before upload. Publish separately when you want the release boundary to stay explicit.</p>
+            <div class="snippet">
+              <button class="copy-button" type="button" data-copy-target="cli-release">Copy</button>
+              <pre><code id="cli-release"><span class="comment"># Local + remote preflight checks</span>
 cws validate ./dist
 
-<span class="text-zinc-500"># Local checks only (no credentials needed)</span>
-cws validate ./dist --local
-
-<span class="text-zinc-500"># Validate a pre-built zip</span>
-cws validate extension.zip</code></pre>
-          <p class="mt-3 text-xs text-zinc-500 dark:text-zinc-400">Checks: manifest.json validity, required fields, version format, icon files, package size, version &gt; published <em>and</em> submitted revisions, no pending submission, and policy warnings/takedowns. Also runs automatically before every <code>cws upload</code>.</p>
-        </div>
-      </details>
-
-      <details class="group rounded-lg border border-zinc-200 dark:border-zinc-800">
-        <summary class="cursor-pointer px-5 py-4 flex items-center justify-between font-semibold text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition rounded-lg">
-          <span>cws upload</span>
-          <svg class="w-4 h-4 text-zinc-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-        </summary>
-        <div class="px-5 pb-5">
-          <pre class="bg-zinc-900 dark:bg-zinc-800 text-zinc-100 rounded-lg p-4 text-sm font-mono overflow-x-auto"><code><span class="text-zinc-500"># Upload a directory (zips automatically)</span>
+<span class="comment"># Package and upload</span>
 cws upload ./dist
 
-<span class="text-zinc-500"># Upload a pre-built zip</span>
-cws upload extension.zip
-
-<span class="text-zinc-500"># Upload and publish in one step</span>
-cws upload ./dist --publish
-
-<span class="text-zinc-500"># Specify extension ID</span>
-cws upload ./dist -e abcdefghijklmnopabcdefghijklmnop
-
-<span class="text-zinc-500"># Don't wait for processing</span>
-cws upload ./dist --wait=false
-
-<span class="text-zinc-500"># Skip pre-upload validation</span>
-cws upload ./dist --skip-validate</code></pre>
-        </div>
-      </details>
-
-      <details class="group rounded-lg border border-zinc-200 dark:border-zinc-800">
-        <summary class="cursor-pointer px-5 py-4 flex items-center justify-between font-semibold text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition rounded-lg">
-          <span>cws publish</span>
-          <svg class="w-4 h-4 text-zinc-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-        </summary>
-        <div class="px-5 pb-5">
-          <pre class="bg-zinc-900 dark:bg-zinc-800 text-zinc-100 rounded-lg p-4 text-sm font-mono overflow-x-auto"><code><span class="text-zinc-500"># Publish immediately after review</span>
-cws publish
-
-<span class="text-zinc-500"># Stage for review without auto-publishing</span>
-cws publish --staged
-
-<span class="text-zinc-500"># Attempt to skip review (only some changes are eligible)</span>
+<span class="comment"># Submit the latest upload</span>
+cws publish</code></pre>
+            </div>
+          </div>
+          <div class="panel">
+            <h3>Command reference</h3>
+            <p>Store and packaging commands accept <code class="inline-code">--json</code>. Select a named profile with <code class="inline-code">--ext &lt;name&gt;</code>.</p>
+            <table class="command-list">
+              <tbody>
+                <tr><td>cws init [--global]</td><td>Configure OAuth credentials and publisher settings</td></tr>
+                <tr><td>cws login</td><td>Re-acquire a refresh token in the browser</td></tr>
+                <tr><td>cws validate [source]</td><td>Check manifest, icons, size, versions, and store state</td></tr>
+                <tr><td>cws pack [source]</td><td>Create a clean extension ZIP without uploading</td></tr>
+                <tr><td>cws upload [source]</td><td>Validate, package, upload, and wait for processing</td></tr>
+                <tr><td>cws publish</td><td>Submit the latest uploaded version</td></tr>
+                <tr><td>cws status</td><td>Read published and submitted state, warnings, and takedowns</td></tr>
+                <tr><td>cws rollout &lt;percentage&gt;</td><td>Adjust a partial rollout for eligible extensions</td></tr>
+                <tr><td>cws cancel</td><td>Cancel a pending submission</td></tr>
+                <tr><td>cws version</td><td>Print the installed version</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="panel">
+            <h3>Useful variations</h3>
+            <details>
+              <summary>Validation</summary>
+              <div class="snippet">
+                <pre><code>cws validate ./dist          <span class="comment"># local + store checks</span>
+cws validate ./dist --local  <span class="comment"># no credentials required</span>
+cws validate extension.zip   <span class="comment"># pre-built package</span></code></pre>
+              </div>
+            </details>
+            <details>
+              <summary>Publishing</summary>
+              <div class="snippet">
+                <pre><code>cws publish --staged
 cws publish --skip-review
-
-<span class="text-zinc-500"># Fail if the store reports validation warnings</span>
 cws publish --block-on-warnings
-
-<span class="text-zinc-500"># Publish with an initial partial rollout</span>
 cws publish --deploy-percentage 10</code></pre>
-          <p class="mt-3 text-xs text-zinc-500 dark:text-zinc-400">Non-blocking store warnings are printed after every publish.</p>
-        </div>
-      </details>
-
-      <details class="group rounded-lg border border-zinc-200 dark:border-zinc-800">
-        <summary class="cursor-pointer px-5 py-4 flex items-center justify-between font-semibold text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition rounded-lg">
-          <span>cws status</span>
-          <svg class="w-4 h-4 text-zinc-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-        </summary>
-        <div class="px-5 pb-5">
-          <pre class="bg-zinc-900 dark:bg-zinc-800 text-zinc-100 rounded-lg p-4 text-sm font-mono overflow-x-auto"><code><span class="text-zinc-500"># Human-readable output</span>
-cws status
-
-<span class="text-zinc-500"># Raw JSON (for scripting)</span>
-cws status --json</code></pre>
-        </div>
-      </details>
-
-      <details class="group rounded-lg border border-zinc-200 dark:border-zinc-800">
-        <summary class="cursor-pointer px-5 py-4 flex items-center justify-between font-semibold text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition rounded-lg">
-          <span>cws rollout</span>
-          <svg class="w-4 h-4 text-zinc-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-        </summary>
-        <div class="px-5 pb-5">
-          <pre class="bg-zinc-900 dark:bg-zinc-800 text-zinc-100 rounded-lg p-4 text-sm font-mono overflow-x-auto"><code><span class="text-zinc-500"># Set to 50% rollout</span>
-cws rollout 50
-
-<span class="text-zinc-500"># Full rollout</span>
-cws rollout 100</code></pre>
-        </div>
-      </details>
-
-      <details class="group rounded-lg border border-zinc-200 dark:border-zinc-800">
-        <summary class="cursor-pointer px-5 py-4 flex items-center justify-between font-semibold text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition rounded-lg">
-          <span>cws cancel</span>
-          <svg class="w-4 h-4 text-zinc-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-        </summary>
-        <div class="px-5 pb-5">
-          <pre class="bg-zinc-900 dark:bg-zinc-800 text-zinc-100 rounded-lg p-4 text-sm font-mono overflow-x-auto"><code><span class="text-zinc-500"># Cancel a pending submission under review</span>
-cws cancel
-
-<span class="text-zinc-500"># Cancel for a specific extension</span>
-cws cancel -e abcdefghijklmnopabcdefghijklmnop</code></pre>
-        </div>
-      </details>
-
-      <details class="group rounded-lg border border-zinc-200 dark:border-zinc-800">
-        <summary class="cursor-pointer px-5 py-4 flex items-center justify-between font-semibold text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition rounded-lg">
-          <span>cws init</span>
-          <svg class="w-4 h-4 text-zinc-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-        </summary>
-        <div class="px-5 pb-5">
-          <pre class="bg-zinc-900 dark:bg-zinc-800 text-zinc-100 rounded-lg p-4 text-sm font-mono overflow-x-auto"><code><span class="text-zinc-500"># Recommended: keep credentials outside the project</span>
-cws init --global
-
-<span class="text-zinc-500"># Optional: write a local config containing credentials</span>
-cws init</code></pre>
-          <p class="mt-3 text-xs text-zinc-500 dark:text-zinc-400">Interactive wizard that guides you through configuring OAuth2 Client ID, Client Secret, Refresh Token, and Publisher ID. Secrets are read without echoing, credentials are validated before saving, and a local <code>cws.toml</code> is added to <code>.gitignore</code>. Use <code>cws login</code> later to refresh an expired token.</p>
-        </div>
-      </details>
-
-    </div>
-
-    <!-- Exit codes -->
-    <div class="mt-10 overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
-      <table class="w-full text-sm">
-        <thead>
-          <tr class="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
-            <th class="text-left px-4 py-3 font-semibold">Exit Code</th>
-            <th class="text-left px-4 py-3 font-semibold">Meaning</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-zinc-200 dark:divide-zinc-800">
-          <tr><td class="px-4 py-3 font-mono text-xs">0</td><td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">Success</td></tr>
-          <tr><td class="px-4 py-3 font-mono text-xs">1</td><td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">Error (API error, validation failure, invalid config, timeout, etc.)</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </section>
-
-  <!-- Configuration -->
-  <section id="config" class="border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
-    <div class="max-w-3xl mx-auto px-4 sm:px-6 py-20">
-      <h2 class="text-2xl sm:text-3xl font-bold text-center">Configuration</h2>
-      <p class="mt-3 text-center text-zinc-500 dark:text-zinc-400 mb-12">TOML file, env vars, and CLI flags — use any combination.</p>
-
-      <!-- Config file -->
-      <div>
-        <h3 class="font-semibold mb-3">Config file</h3>
-        <p class="text-sm text-zinc-500 dark:text-zinc-400 mb-3"><code class="text-xs bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">cws init --global</code> writes credentials to <code class="text-xs bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">~/.config/cws/cws.toml</code>. Keep only extension and packaging settings in the project:</p>
-        <div class="relative">
-          <pre class="bg-zinc-900 dark:bg-zinc-800 text-zinc-100 rounded-lg p-4 text-sm font-mono overflow-x-auto"><code>[extensions.default]
-id = "abcdefghijklmnopabcdefghijklmnop"
-source = "./dist"</code></pre>
-        </div>
-        <p class="mt-3 text-sm text-zinc-500 dark:text-zinc-400">Running <code class="text-xs bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">cws init</code> without <code class="text-xs bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">--global</code> writes credentials to <code class="text-xs bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">./cws.toml</code>. That file contains secrets and must not be committed.</p>
-      </div>
-
-      <!-- Env vars -->
-      <div class="mt-10">
-        <h3 class="font-semibold mb-3">Environment variables</h3>
-        <div class="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
-          <table class="w-full text-sm">
-            <thead>
-              <tr class="border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
-                <th class="text-left px-4 py-3 font-semibold">Variable</th>
-                <th class="text-left px-4 py-3 font-semibold">Description</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-zinc-200 dark:divide-zinc-800">
-              <tr><td class="px-4 py-3 font-mono text-xs">CWS_CLIENT_ID</td><td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">OAuth2 Client ID</td></tr>
-              <tr><td class="px-4 py-3 font-mono text-xs">CWS_CLIENT_SECRET</td><td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">OAuth2 Client Secret</td></tr>
-              <tr><td class="px-4 py-3 font-mono text-xs">CWS_REFRESH_TOKEN</td><td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">OAuth2 Refresh Token</td></tr>
-              <tr><td class="px-4 py-3 font-mono text-xs">CWS_PUBLISHER_ID</td><td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">Publisher ID</td></tr>
-              <tr><td class="px-4 py-3 font-mono text-xs">CWS_EXTENSION_ID</td><td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">Default Extension ID</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- Priority -->
-      <div class="mt-10">
-        <h3 class="font-semibold mb-3">Priority order</h3>
-        <ol class="space-y-2 text-sm text-zinc-500 dark:text-zinc-400 list-decimal list-inside">
-          <li>CLI flags (<code class="text-xs bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">--extension-id</code>, etc.)</li>
-          <li>Environment variables (<code class="text-xs bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">CWS_*</code>)</li>
-          <li>Local <code class="text-xs bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">cws.toml</code> (current directory)</li>
-          <li>Global <code class="text-xs bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">~/.config/cws/cws.toml</code></li>
-        </ol>
-      </div>
-    </div>
-  </section>
-
-  <!-- CI/CD -->
-  <section id="cicd" class="max-w-3xl mx-auto px-4 sm:px-6 py-20">
-    <h2 class="text-2xl sm:text-3xl font-bold text-center">CI/CD</h2>
-    <p class="mt-3 text-center text-zinc-500 dark:text-zinc-400 mb-12">Drop the binary into any pipeline — zero dependencies.</p>
-
-    <h3 class="font-semibold mb-3">GitHub Action</h3>
-    <div class="relative">
-      <pre class="bg-zinc-900 dark:bg-zinc-800 text-zinc-100 rounded-lg p-4 text-sm font-mono overflow-x-auto"><code><span class="text-zinc-500"># .github/workflows/publish.yml</span>
-- name: Upload and publish extension
+              </div>
+            </details>
+            <details>
+              <summary>Machine-readable output</summary>
+              <div class="snippet">
+                <pre><code>cws status --json
+cws upload ./dist --json</code></pre>
+              </div>
+            </details>
+          </div>
+          <div class="panel" id="cicd">
+            <h3>GitHub Actions</h3>
+            <p>Pin both the Action and binary version for repeatable releases.</p>
+            <div class="snippet">
+              <button class="copy-button" type="button" data-copy-target="action-example">Copy</button>
+              <pre><code id="action-example">- name: Upload and publish extension
   uses: vaughnbosu/cws-cli@v1.3.1
   with:
     version: v1.3.1
@@ -475,118 +677,216 @@ source = "./dist"</code></pre>
     refresh-token: ${{ secrets.CWS_REFRESH_TOKEN }}
     publisher-id: ${{ secrets.CWS_PUBLISHER_ID }}
     extension-id: ${{ vars.EXTENSION_ID }}</code></pre>
-    </div>
-    <p class="mt-3 text-sm text-zinc-500 dark:text-zinc-400">The Action supports Linux and macOS runners on amd64 or arm64. Standalone Windows binaries are available from GitHub Releases.</p>
-
-    <h3 class="font-semibold mb-3 mt-10">Any other CI</h3>
-    <div class="relative">
-      <pre class="bg-zinc-900 dark:bg-zinc-800 text-zinc-100 rounded-lg p-4 text-sm font-mono overflow-x-auto"><code>- name: Install cws
-  run: curl -fsSL https://vaughnbosu.github.io/cws-cli/install.sh | bash
-
-- name: Upload and publish extension
-  env:
-    CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
-    CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
-    CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
-    CWS_PUBLISHER_ID: ${{ secrets.CWS_PUBLISHER_ID }}
-  run: cws upload ./dist -e ${{ vars.EXTENSION_ID }} --publish --json</code></pre>
-    </div>
-  </section>
-
-  <!-- Installation -->
-  <section class="border-t border-zinc-200 dark:border-zinc-800">
-    <div class="max-w-3xl mx-auto px-4 sm:px-6 py-20">
-      <h2 class="text-2xl sm:text-3xl font-bold text-center">Installation</h2>
-      <p class="mt-3 text-center text-zinc-500 dark:text-zinc-400 mb-12">Multiple ways to install — pick what works for you.</p>
-
-      <div class="space-y-8">
-
-        <div>
-          <h3 class="font-semibold mb-3">Homebrew (macOS & Linux)</h3>
-          <div class="relative">
-            <pre class="bg-zinc-900 dark:bg-zinc-800 text-zinc-100 rounded-lg p-4 text-sm font-mono overflow-x-auto"><code>brew install --cask vaughnbosu/tap/cws</code></pre>
-            <button data-copy="brew install --cask vaughnbosu/tap/cws" class="absolute right-2 top-2 p-1.5 rounded hover:bg-zinc-700 transition text-zinc-400 hover:text-zinc-200" title="Copy">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" stroke-width="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke-width="2"/></svg>
-            </button>
+            </div>
+            <p style="margin-top: 13px; margin-bottom: 0;">The Action supports GitHub-hosted Linux and macOS runners on amd64 or arm64. The CLI also ships Windows binaries.</p>
           </div>
         </div>
-
-        <div>
-          <h3 class="font-semibold mb-3">Quick install (macOS & Linux)</h3>
-          <div class="relative">
-            <pre class="bg-zinc-900 dark:bg-zinc-800 text-zinc-100 rounded-lg p-4 text-sm font-mono overflow-x-auto"><code>curl -fsSL https://vaughnbosu.github.io/cws-cli/install.sh | bash</code></pre>
-            <button data-copy="curl -fsSL https://vaughnbosu.github.io/cws-cli/install.sh | bash" class="absolute right-2 top-2 p-1.5 rounded hover:bg-zinc-700 transition text-zinc-400 hover:text-zinc-200" title="Copy">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" stroke-width="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke-width="2"/></svg>
-            </button>
-          </div>
-        </div>
-
-        <div>
-          <h3 class="font-semibold mb-3">From source</h3>
-          <div class="relative">
-            <pre class="bg-zinc-900 dark:bg-zinc-800 text-zinc-100 rounded-lg p-4 text-sm font-mono overflow-x-auto"><code>go install github.com/vaughnbosu/cws-cli/cmd/cws@latest</code></pre>
-            <button data-copy="go install github.com/vaughnbosu/cws-cli/cmd/cws@latest" class="absolute right-2 top-2 p-1.5 rounded hover:bg-zinc-700 transition text-zinc-400 hover:text-zinc-200" title="Copy">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" stroke-width="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke-width="2"/></svg>
-            </button>
-          </div>
-          <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">Make sure <code class="text-xs bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">$GOPATH/bin</code> is in your <code class="text-xs bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">PATH</code>.</p>
-        </div>
-
-        <div>
-          <h3 class="font-semibold mb-3">GitHub releases</h3>
-          <p class="text-sm text-zinc-500 dark:text-zinc-400">Download the latest binary for your platform from <a href="https://github.com/vaughnbosu/cws-cli/releases" target="_blank" rel="noopener" class="underline hover:text-zinc-900 dark:hover:text-zinc-100 transition">Releases</a>.</p>
-        </div>
-
-        <div>
-          <h3 class="font-semibold mb-3">Windows (PowerShell)</h3>
-          <div class="relative">
-            <pre class="bg-zinc-900 dark:bg-zinc-800 text-zinc-100 rounded-lg p-4 text-sm font-mono overflow-x-auto"><code>Invoke-WebRequest -Uri https://github.com/vaughnbosu/cws-cli/releases/latest/download/cws_windows_amd64.zip -OutFile cws.zip
-Expand-Archive cws.zip -DestinationPath .
-Move-Item cws.exe C:\Windows\System32\</code></pre>
-          </div>
-        </div>
-
       </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- Footer -->
-  <footer class="border-t border-zinc-200 dark:border-zinc-800">
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-zinc-400 dark:text-zinc-500">
-      <div>MIT License</div>
-      <div class="flex items-center gap-6">
-        <a href="https://github.com/vaughnbosu/cws-cli" target="_blank" rel="noopener" class="hover:text-zinc-600 dark:hover:text-zinc-300 transition">GitHub</a>
-        <a href="https://github.com/vaughnbosu/cws-cli/releases" target="_blank" rel="noopener" class="hover:text-zinc-600 dark:hover:text-zinc-300 transition">Releases</a>
+    <section class="content tint" id="mcp" aria-labelledby="mcp-title">
+      <div class="wrap split reverse">
+        <div class="panel-stack">
+          <div class="panel">
+            <h3>Install the server</h3>
+            <p>The MCP binary runs locally over stdio. It reads the same global credentials and project profiles as the CLI.</p>
+            <div class="snippet compact">
+              <button class="copy-button" type="button" data-copy-target="mcp-install">Copy</button>
+              <pre><code id="mcp-install">brew install --cask vaughnbosu/tap/cws-mcp</code></pre>
+            </div>
+          </div>
+
+          <div class="tabs">
+            <div class="tab-list" role="tablist" aria-label="MCP client setup">
+              <button class="tab-button" id="tab-codex" type="button" role="tab" aria-selected="true" aria-controls="panel-codex">Codex</button>
+              <button class="tab-button" id="tab-claude" type="button" role="tab" aria-selected="false" aria-controls="panel-claude" tabindex="-1">Claude Code</button>
+              <button class="tab-button" id="tab-json" type="button" role="tab" aria-selected="false" aria-controls="panel-json" tabindex="-1">Cursor / Desktop</button>
+              <button class="tab-button" id="tab-vscode" type="button" role="tab" aria-selected="false" aria-controls="panel-vscode" tabindex="-1">VS Code</button>
+            </div>
+            <div class="tab-panel" id="panel-codex" role="tabpanel" aria-labelledby="tab-codex">
+              <h3>Codex</h3>
+              <p>Add this to <code class="inline-code">~/.codex/config.toml</code>. The CLI, IDE extension, and desktop app share this configuration.</p>
+              <div class="snippet">
+                <button class="copy-button" type="button" data-copy-target="codex-config">Copy</button>
+                <pre><code id="codex-config">[mcp_servers.chrome-web-store]
+command = "cws-mcp"
+default_tools_approval_mode = "writes"
+
+[mcp_servers.chrome-web-store.env]
+CWS_WORKSPACE = "/absolute/path/to/extension"</code></pre>
+              </div>
+              <p style="margin: 14px 0 0;">Run <code class="inline-code">codex mcp list</code>, then use <code class="inline-code">/mcp</code> in a session to inspect the connection.</p>
+            </div>
+            <div class="tab-panel" id="panel-claude" role="tabpanel" aria-labelledby="tab-claude" hidden>
+              <h3>Claude Code</h3>
+              <p>Create a machine-local entry so the absolute workspace path is not committed.</p>
+              <div class="snippet">
+                <button class="copy-button" type="button" data-copy-target="claude-config">Copy</button>
+                <pre><code id="claude-config">claude mcp add --transport stdio --scope local \
+  chrome-web-store \
+  --env CWS_WORKSPACE=/absolute/path/to/extension \
+  -- cws-mcp</code></pre>
+              </div>
+            </div>
+            <div class="tab-panel" id="panel-json" role="tabpanel" aria-labelledby="tab-json" hidden>
+              <h3>Cursor, Claude Desktop, or Windsurf</h3>
+              <p>Place this <code class="inline-code">mcpServers</code> entry in the client’s MCP config. GUI clients may need the full binary path from <code class="inline-code">command -v cws-mcp</code>.</p>
+              <div class="snippet">
+                <button class="copy-button" type="button" data-copy-target="json-config">Copy</button>
+                <pre><code id="json-config">{
+  "mcpServers": {
+    "chrome-web-store": {
+      "command": "cws-mcp",
+      "env": {
+        "CWS_WORKSPACE": "/absolute/path/to/extension"
+      }
+    }
+  }
+}</code></pre>
+              </div>
+            </div>
+            <div class="tab-panel" id="panel-vscode" role="tabpanel" aria-labelledby="tab-vscode" hidden>
+              <h3>VS Code with Copilot</h3>
+              <p>VS Code uses <code class="inline-code">servers</code>, not <code class="inline-code">mcpServers</code>, and requires the stdio type.</p>
+              <div class="snippet">
+                <button class="copy-button" type="button" data-copy-target="vscode-config">Copy</button>
+                <pre><code id="vscode-config">{
+  "servers": {
+    "chrome-web-store": {
+      "type": "stdio",
+      "command": "cws-mcp",
+      "cwd": "${workspaceFolder}",
+      "env": { "CWS_WORKSPACE": "${workspaceFolder}" }
+    }
+  }
+}</code></pre>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h3>Tools and safety boundaries</h3>
+            <p>The client can inspect auth, config, packages, and store state. Store mutations require an explicit <code class="inline-code">confirm: true</code> argument.</p>
+            <div class="safety-grid">
+              <div class="safety-card">
+                <strong><span class="dot"></span>Read and prepare</strong>
+                <p><code>check_auth</code>, <code>get_setup_instructions</code>, <code>list_extension_profiles</code>, <code>get_extension_status</code>, <code>validate_extension</code>, <code>pack_extension</code></p>
+              </div>
+              <div class="safety-card">
+                <strong><span class="dot write"></span>Confirmed writes</strong>
+                <p><code>upload_extension</code>, <code>publish_extension</code>, <code>set_rollout_percentage</code>, <code>cancel_submission</code></p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="sticky-copy">
+          <p class="eyebrow">cws MCP</p>
+          <h2 id="mcp-title">Release tools inside your AI workflow.</h2>
+          <p>Connect a local MCP server and let your client validate a build, inspect store status, or prepare a release with structured inputs and outputs.</p>
+          <a class="version-link" href="https://github.com/vaughnbosu/cws-mcp" target="_blank" rel="noopener">github.com/vaughnbosu/cws-mcp ↗</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="content" id="config" aria-labelledby="config-title">
+      <div class="wrap">
+        <div class="section-heading">
+          <p class="eyebrow">Configuration</p>
+          <h2 id="config-title">Secrets stay global. Projects stay portable.</h2>
+          <p>Both binaries resolve the same TOML files and environment variables. The MCP server additionally confines source and output paths to <code class="inline-code">CWS_WORKSPACE</code>.</p>
+        </div>
+        <div class="config-grid">
+          <div class="config-card">
+            <h3>Resolution priority</h3>
+            <p>The first value found wins.</p>
+            <ol class="priority">
+              <li>Command flags such as <code>--extension-id</code></li>
+              <li>Environment variables prefixed with <code>CWS_</code></li>
+              <li>Project <code>./cws.toml</code></li>
+              <li>Global <code>~/.config/cws/cws.toml</code></li>
+            </ol>
+          </div>
+          <div class="config-card">
+            <h3>Environment variables</h3>
+            <p>Useful in CI or when file-based credentials are not appropriate.</p>
+            <dl class="env-list">
+              <div><dt>CWS_CLIENT_ID</dt><dd>OAuth client ID</dd></div>
+              <div><dt>CWS_CLIENT_SECRET</dt><dd>OAuth client secret</dd></div>
+              <div><dt>CWS_REFRESH_TOKEN</dt><dd>OAuth refresh token</dd></div>
+              <div><dt>CWS_PUBLISHER_ID</dt><dd>Chrome Web Store publisher ID</dd></div>
+              <div><dt>CWS_EXTENSION_ID</dt><dd>Default extension ID override</dd></div>
+              <div><dt>CWS_WORKSPACE</dt><dd>MCP project root and path boundary</dd></div>
+            </dl>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="content tint" aria-labelledby="install-title">
+      <div class="narrow">
+        <div class="callout">
+          <div>
+            <h2 id="install-title">Start with the CLI, add MCP when you want it.</h2>
+            <p>The same credentials and project config work across both tools.</p>
+          </div>
+          <a class="button primary" href="#setup">Set up cws</a>
+        </div>
+        <p class="subtle" style="margin: 24px 0 0; text-align: center; font-size: 13px;">Prefer another install method? Use the <a class="text-link" href="install.sh">install script</a>, download a binary from <a class="text-link" href="https://github.com/vaughnbosu/cws-cli/releases" target="_blank" rel="noopener">CLI Releases</a>, or install either project with Go.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap footer-inner">
+      <span>cws CLI and MCP are MIT licensed.</span>
+      <div class="footer-links">
+        <a href="https://github.com/vaughnbosu/cws-cli" target="_blank" rel="noopener">CLI repository</a>
+        <a href="https://github.com/vaughnbosu/cws-mcp" target="_blank" rel="noopener">MCP repository</a>
+        <a href="https://github.com/vaughnbosu/cws-mcp/blob/master/README.md#client-setup" target="_blank" rel="noopener">All MCP clients</a>
       </div>
     </div>
   </footer>
 
   <script>
-    // Mobile menu toggle
-    document.getElementById('mobile-toggle').addEventListener('click', function() {
-      document.getElementById('mobile-menu').classList.toggle('hidden');
-    });
-
-    // Close mobile menu on link click
-    document.querySelectorAll('#mobile-menu a').forEach(function(link) {
-      link.addEventListener('click', function() {
-        document.getElementById('mobile-menu').classList.add('hidden');
+    document.querySelectorAll('[data-copy-target]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const target = document.getElementById(button.dataset.copyTarget);
+        if (!target) return;
+        try {
+          await navigator.clipboard.writeText(target.innerText);
+          button.textContent = 'Copied';
+          button.classList.add('copied');
+          window.setTimeout(() => {
+            button.textContent = 'Copy';
+            button.classList.remove('copied');
+          }, 1600);
+        } catch {
+          button.textContent = 'Select';
+        }
       });
     });
 
-    // Copy to clipboard
-    document.querySelectorAll('[data-copy]').forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        var text = this.getAttribute('data-copy');
-        navigator.clipboard.writeText(text).then(function() {
-          btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
-          setTimeout(function() {
-            btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" stroke-width="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke-width="2"/></svg>';
-          }, 2000);
-        });
+    const tabs = [...document.querySelectorAll('[role="tab"]')];
+    tabs.forEach((tab, index) => {
+      tab.addEventListener('click', () => selectTab(tab));
+      tab.addEventListener('keydown', (event) => {
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+        event.preventDefault();
+        const offset = event.key === 'ArrowRight' ? 1 : -1;
+        const next = tabs[(index + offset + tabs.length) % tabs.length];
+        selectTab(next);
+        next.focus();
       });
     });
+
+    function selectTab(selected) {
+      tabs.forEach((tab) => {
+        const active = tab === selected;
+        tab.setAttribute('aria-selected', String(active));
+        tab.tabIndex = active ? 0 : -1;
+        document.getElementById(tab.getAttribute('aria-controls')).hidden = !active;
+      });
+    }
   </script>
-
 </body>
 </html>
