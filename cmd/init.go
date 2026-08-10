@@ -9,9 +9,9 @@ import (
 	"syscall"
 
 	"github.com/spf13/cobra"
+	"github.com/vaughnbosu/cws-cli/internal/output"
 	"github.com/vaughnbosu/cws-cli/pkg/auth"
 	"github.com/vaughnbosu/cws-cli/pkg/config"
-	"github.com/vaughnbosu/cws-cli/internal/output"
 	"golang.org/x/term"
 )
 
@@ -145,11 +145,11 @@ func runInit(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// ensureGitignored appends the entry to .gitignore when one exists in the
-// current directory and the entry is missing. Local cws.toml holds secrets.
+// ensureGitignored appends the entry to .gitignore when it is missing.
+// Local cws.toml holds secrets.
 func ensureGitignored(entry string) {
 	data, err := os.ReadFile(".gitignore")
-	if err != nil {
+	if err != nil && !os.IsNotExist(err) {
 		output.Info("Tip: Add %s to .gitignore — it contains secrets.", entry)
 		return
 	}

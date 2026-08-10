@@ -3,6 +3,7 @@ package tests
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -100,5 +101,30 @@ func TestSaveRefreshToken_InsertsIntoAuthSection(t *testing.T) {
 	data, _ := os.ReadFile(path)
 	if !strings.Contains(string(data), "[auth]\nrefresh_token = \"tok\"") {
 		t.Errorf("token not inserted into [auth] section:\n%s", data)
+	}
+}
+
+func TestSaveRefreshToken_TightensExistingFilePermissions(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows does not expose Unix permission bits")
+	}
+	dir := t.TempDir()
+	path := filepath.Join(dir, "cws.toml")
+	if err := os.WriteFile(path, []byte("[auth]\nrefresh_token = \"old\"\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(path, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := cmd.SaveRefreshToken(path, "new", &config.Config{}); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := info.Mode().Perm(); got != 0600 {
+		t.Fatalf("config permissions = %04o, want 0600", got)
 	}
 }

@@ -36,19 +36,26 @@ changelog:
       - "^test:"
       - "^ci:"
 
-brews:
-  - repository:
+homebrew_casks:
+  - name: cws
+    binaries:
+      - cws
+    repository:
       owner: vaughnbosu
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-    directory: Formula
+    directory: Casks
+    url:
+      verified: github.com/vaughnbosu/cws-cli/
     homepage: "https://vaughnbosu.github.io/cws-cli/"
     description: "A CLI for managing Chrome Web Store extensions"
     license: "MIT"
-    install: |
-      bin.install "cws"
-    test: |
-      system "#{bin}/cws", "version"
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/cws"]
+          end
 
 release:
   github:

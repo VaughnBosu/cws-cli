@@ -25,11 +25,12 @@ type UploadOptions struct {
 
 // UploadResult is the machine-readable output of an upload.
 type UploadResult struct {
-	ItemID       string `json:"itemId,omitempty"`
-	CrxVersion   string `json:"crxVersion,omitempty"`
-	UploadState  string `json:"uploadState"`
-	Published    bool   `json:"published,omitempty"`
-	PublishState string `json:"publishState,omitempty"`
+	ItemID          string        `json:"itemId,omitempty"`
+	CrxVersion      string        `json:"crxVersion,omitempty"`
+	UploadState     string        `json:"uploadState"`
+	Published       bool          `json:"published,omitempty"`
+	PublishState    string        `json:"publishState,omitempty"`
+	PublishWarnings []api.Warning `json:"publishWarnings,omitempty"`
 }
 
 // Upload validates (unless skipped), zips if needed, uploads, and optionally publishes.
@@ -107,6 +108,9 @@ func Upload(ctx context.Context, actx *Context, opts UploadOptions) (*UploadResu
 		}
 		out.Published = true
 		out.PublishState = pubResp.State
+		if pubResp.WarningInfo != nil {
+			out.PublishWarnings = pubResp.WarningInfo.Warnings
+		}
 	}
 
 	return out, nil
@@ -157,23 +161,58 @@ func PrepareZip(source string, pkg config.PackageConfig) ([]byte, error) {
 		return nil, fmt.Errorf("directory does not contain a manifest.json: %s", source)
 	}
 
-	return cwszip.ZipDirectoryWithOptions(absSource, zipOptions(pkg))
+	data, err := cwszip.ZipDirectoryWithOptions(absSource, zipOptions(pkg))
+	if err != nil {
+		return nil, err
+	}
+	hasManifest, err := cwszip.ContainsManifestInZip(data)
+	if err != nil {
+		return nil, err
+	}
+	if !hasManifest {
+		return nil, fmt.Errorf("package does not contain a manifest.json")
+	}
+	return data, nil
 }
 
 // WaitForUpload polls until upload processing completes or timeout is reached.
 func WaitForUpload(ctx context.Context, client *api.Client, extensionID string, timeoutSec int) (*api.UploadResponse, error) {
-	deadline := time.Now().Add(time.Duration(timeoutSec) * time.Second)
-	pollInterval := 5 * time.Second
+	return waitForUpload(ctx, client, extensionID, time.Duration(timeoutSec)*time.Second, 5*time.Second)
+}
 
-	for time.Now().Before(deadline) {
+func waitForUpload(ctx context.Context, client *api.Client, extensionID string, timeout, pollInterval time.Duration) (*api.UploadResponse, error) {
+	waitCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	ticker := time.NewTicker(pollInterval)
+	defer ticker.Stop()
+	timeoutError := func() error {
+		if timeout%time.Second == 0 {
+			return fmt.Errorf("timed out waiting for upload processing after %d seconds", int(timeout/time.Second))
+		}
+		return fmt.Errorf("timed out waiting for upload processing after %s", timeout)
+	}
+
+	for {
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
-		case <-time.After(pollInterval):
+		case <-waitCtx.Done():
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
+			return nil, timeoutError()
+		case <-ticker.C:
 		}
 
-		status, _, err := client.FetchStatus(ctx, extensionID)
+		status, _, err := client.FetchStatus(waitCtx, extensionID)
 		if err != nil {
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
+			if waitCtx.Err() != nil {
+				return nil, timeoutError()
+			}
 			return nil, err
 		}
 
@@ -185,6 +224,4 @@ func WaitForUpload(ctx context.Context, client *api.Client, extensionID string, 
 			}, nil
 		}
 	}
-
-	return nil, fmt.Errorf("timed out waiting for upload processing after %d seconds", timeoutSec)
 }

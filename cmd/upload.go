@@ -51,11 +51,9 @@ func runUpload(cmd *cobra.Command, args []string) error {
 	}
 
 	if !skipValidate {
-		output.Info("Validating...")
-	}
-	output.Info("Uploading to extension %s...", actx.ExtensionID)
-	if publish {
-		output.Info("Publishing...")
+		output.Info("Validating package before upload...")
+	} else {
+		output.Info("Uploading to extension %s...", actx.ExtensionID)
 	}
 
 	result, err := service.Upload(context.Background(), actx, service.UploadOptions{
@@ -87,6 +85,9 @@ func runUpload(cmd *cobra.Command, args []string) error {
 
 	if api.IsUploadInProgress(result.UploadState) {
 		output.Info("Upload is still processing. Use 'cws status' to check progress.")
+		if publish {
+			output.Info("Automatic publish did not start. Run 'cws publish' after processing succeeds.")
+		}
 		return emitUploadJSON(result)
 	}
 
@@ -101,6 +102,7 @@ func runUpload(cmd *cobra.Command, args []string) error {
 	} else if publish {
 		output.Info("Publish submitted successfully.")
 	}
+	printWarnings(result.PublishWarnings)
 
 	return emitUploadJSON(result)
 }

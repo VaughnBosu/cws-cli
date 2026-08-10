@@ -7,7 +7,7 @@ A single-binary CLI for managing Chrome Web Store extensions. Upload, publish, r
 ## Install
 
 ```bash
-brew install vaughnbosu/tap/cws
+brew install --cask vaughnbosu/tap/cws
 ```
 
 Or via script:
@@ -25,7 +25,7 @@ go install github.com/vaughnbosu/cws-cli/cmd/cws@latest
 ## Quick Start
 
 ```bash
-cws init            # credential setup with browser sign-in
+cws init --global   # credential setup with browser sign-in
 cws validate ./dist # pre-flight checks
 cws upload ./dist   # validate, zip, and upload
 cws publish         # publish to the store
@@ -35,7 +35,7 @@ cws publish         # publish to the store
 
 | Command | Description |
 |---------|-------------|
-| `cws init` | Interactive credential setup wizard (browser sign-in) |
+| `cws init [--global]` | Interactive credential setup wizard (browser sign-in) |
 | `cws login` | Re-acquire a refresh token via browser sign-in |
 | `cws validate [source]` | Pre-flight validation (manifest, version, icons, size, policy flags) |
 | `cws pack [source]` | Zip an extension directory without uploading |
@@ -46,9 +46,9 @@ cws publish         # publish to the store
 | `cws cancel` | Cancel a pending submission |
 | `cws version` | Print CLI version |
 
-Every command accepts `--json` for machine-readable output, `-e/--extension-id`
-to override the target extension, and `--ext <name>` to select a named extension
-profile from `cws.toml`.
+Store and packaging commands accept `--json` for machine-readable output.
+Use `-e/--extension-id` to override the target extension or `--ext <name>` to
+select a named profile from `cws.toml`.
 
 ### Validate
 
@@ -81,14 +81,17 @@ Non-blocking store warnings are printed after every publish.
 
 Config priority: **CLI flags > env vars (`CWS_*`) > local `cws.toml` > global `~/.config/cws/cws.toml`**.
 
+Keep credentials in the global config:
+
+```bash
+cws init --global
+```
+
+This writes OAuth credentials and the publisher ID to
+`~/.config/cws/cws.toml`. A project `cws.toml` can then contain only extension
+and packaging settings, so it is safe to commit:
+
 ```toml
-publisher_id = "abc1234567890"
-
-[auth]
-client_id = "xxxx.apps.googleusercontent.com"
-client_secret = "GOCSPX-xxxx"
-refresh_token = "1//xxxx"
-
 [extensions.default]
 id = "abcdefghijklmnopabcdefghijklmnop"
 source = "./dist"
@@ -104,6 +107,12 @@ exclude = ["docs", ".log"]      # extra exclusions
 include = ["package.json"]      # keep files the defaults would drop
 ```
 
+Running `cws init` without `--global` writes credentials to `./cws.toml` and
+adds that file to `.gitignore`. Do not commit a local config containing secrets.
+Generated `.zip` and `.crx` packages are excluded from directory builds by
+default; list one under `package.include` only when it is intentionally part of
+the extension.
+
 See [cws.toml.example](cws.toml.example) for the full reference.
 
 ## CI/CD
@@ -112,8 +121,9 @@ See [cws.toml.example](cws.toml.example) for the full reference.
 
 ```yaml
 - name: Upload and publish extension
-  uses: vaughnbosu/cws-cli@main
+  uses: vaughnbosu/cws-cli@v1.3.1
   with:
+    version: v1.3.1
     args: upload ./dist --publish
     client-id: ${{ secrets.CWS_CLIENT_ID }}
     client-secret: ${{ secrets.CWS_CLIENT_SECRET }}
@@ -121,6 +131,9 @@ See [cws.toml.example](cws.toml.example) for the full reference.
     publisher-id: ${{ secrets.CWS_PUBLISHER_ID }}
     extension-id: ${{ vars.EXTENSION_ID }}
 ```
+
+The Action supports Linux and macOS runners on amd64 or arm64. The CLI also
+ships standalone Windows binaries.
 
 ### Any other CI
 
@@ -131,23 +144,13 @@ curl -fsSL https://vaughnbosu.github.io/cws-cli/install.sh | bash
 cws upload ./dist --publish --json
 ```
 
-## Why cws?
-
-| | `cws` | `chrome-webstore-upload-cli` |
-|---|---|---|
-| **Runtime** | Single binary — no dependencies | Requires Node.js + npm |
-| **API version** | Chrome Web Store API **V2** | V1 ([migration requested](https://github.com/fregante/chrome-webstore-upload/issues/114)) |
-| **Setup** | `cws init` wizard with browser sign-in | Manual env var configuration |
-| **Commands** | validate, pack, upload, publish, status, rollout, cancel, login | upload, publish |
-| **Pre-upload validation** | Built-in — manifest, version, icons, and size checks before upload | None |
-| **Config** | TOML file (multi-extension) + env vars + CLI flags | Env vars only |
-| **CI/CD** | GitHub Action or drop-in binary — no `npm install` step | Requires Node.js in your CI image |
-
 ## Development
 
 ```bash
+test -z "$(gofmt -l .)"
+go vet ./...
+go test -race ./...
 go build ./...
-go test ./...
 
 # Opt-in live checks (hit Google endpoints; safe, read-only)
 CWS_LIVE_CONTRACT=1 go test ./tests/ -run TestLiveDiscoveryContract

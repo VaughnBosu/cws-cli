@@ -42,6 +42,13 @@ func Pack(source, output string, pkg config.PackageConfig) (*PackResult, error) 
 	if err != nil {
 		return nil, err
 	}
+	hasManifest, err := cwszip.ContainsManifestInZip(data)
+	if err != nil {
+		return nil, err
+	}
+	if !hasManifest {
+		return nil, fmt.Errorf("package does not contain a manifest.json")
+	}
 
 	outPath := output
 	if outPath == "" {

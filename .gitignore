@@ -1,5 +1,6 @@
 # Binary
 /cws
+dist/
 
 # Config (contains secrets)
 cws.toml

@@ -6,12 +6,11 @@ branding:
 
 inputs:
   args:
-    description: "Arguments passed to cws (e.g. 'upload ./dist --publish')"
+    description: "Whitespace-separated cws arguments (e.g. 'upload ./dist --publish')"
     required: true
   version:
-    description: "cws release version to install (e.g. v1.2.0); defaults to latest"
-    required: false
-    default: "latest"
+    description: "Exact cws release version to install (e.g. v1.3.1)"
+    required: true
   client-id:
     description: "OAuth2 client ID (sets CWS_CLIENT_ID)"
     required: false
@@ -33,29 +32,82 @@ runs:
   steps:
     - name: Install cws
       shell: bash
+      env:
+        CWS_ACTION_VERSION: ${{ inputs.version }}
       run: |
         set -euo pipefail
-        VERSION="${{ inputs.version }}"
-        OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
-        ARCH="$(uname -m)"
-        case "$ARCH" in
-          x86_64) ARCH=amd64 ;;
-          aarch64|arm64) ARCH=arm64 ;;
-        esac
-        if [ "$VERSION" = "latest" ]; then
-          URL="https://github.com/vaughnbosu/cws-cli/releases/latest/download/cws_${OS}_${ARCH}.tar.gz"
-        else
-          URL="https://github.com/vaughnbosu/cws-cli/releases/download/${VERSION}/cws_${OS}_${ARCH}.tar.gz"
+        if [[ ! "$CWS_ACTION_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+          echo "version must be an exact release tag such as v1.3.1" >&2
+          exit 1
         fi
-        curl -fsSL "$URL" | tar -xz -C /tmp cws
-        sudo install /tmp/cws /usr/local/bin/cws
-        cws version
+
+        case "$(uname -s)" in
+          Linux) os=linux ;;
+          Darwin) os=darwin ;;
+          *) echo "unsupported operating system: $(uname -s)" >&2; exit 1 ;;
+        esac
+
+        case "$(uname -m)" in
+          x86_64|amd64) arch=amd64 ;;
+          aarch64|arm64) arch=arm64 ;;
+          *) echo "unsupported architecture: $(uname -m)" >&2; exit 1 ;;
+        esac
+
+        archive="cws_${os}_${arch}.tar.gz"
+        base_url="https://github.com/vaughnbosu/cws-cli/releases/download/${CWS_ACTION_VERSION}"
+        temp_dir="$(mktemp -d "${RUNNER_TEMP}/cws-action.XXXXXX")"
+        install_dir="${RUNNER_TEMP}/cws-action/bin"
+
+        curl --fail --silent --show-error --location \
+          --output "$temp_dir/$archive" "$base_url/$archive"
+        curl --fail --silent --show-error --location \
+          --output "$temp_dir/checksums.txt" "$base_url/checksums.txt"
+
+        expected="$(awk -v file="$archive" '$2 == file { print $1; exit }' "$temp_dir/checksums.txt")"
+        if [[ -z "$expected" ]]; then
+          echo "checksum not found for $archive" >&2
+          exit 1
+        fi
+        if command -v sha256sum >/dev/null 2>&1; then
+          actual="$(sha256sum "$temp_dir/$archive" | awk '{ print $1 }')"
+        else
+          actual="$(shasum -a 256 "$temp_dir/$archive" | awk '{ print $1 }')"
+        fi
+        if [[ "$actual" != "$expected" ]]; then
+          echo "checksum verification failed for $archive" >&2
+          exit 1
+        fi
+
+        mkdir -p "$install_dir"
+        tar -xzf "$temp_dir/$archive" -C "$temp_dir" cws
+        install -m 755 "$temp_dir/cws" "$install_dir/cws"
+        echo "$install_dir" >> "$GITHUB_PATH"
+        "$install_dir/cws" version
     - name: Run cws
       shell: bash
       env:
-        CWS_CLIENT_ID: ${{ inputs.client-id }}
-        CWS_CLIENT_SECRET: ${{ inputs.client-secret }}
-        CWS_REFRESH_TOKEN: ${{ inputs.refresh-token }}
-        CWS_PUBLISHER_ID: ${{ inputs.publisher-id }}
-        CWS_EXTENSION_ID: ${{ inputs.extension-id }}
-      run: cws ${{ inputs.args }}
+        CWS_ACTION_ARGS: ${{ inputs.args }}
+        INPUT_CLIENT_ID: ${{ inputs.client-id }}
+        INPUT_CLIENT_SECRET: ${{ inputs.client-secret }}
+        INPUT_REFRESH_TOKEN: ${{ inputs.refresh-token }}
+        INPUT_PUBLISHER_ID: ${{ inputs.publisher-id }}
+        INPUT_EXTENSION_ID: ${{ inputs.extension-id }}
+      run: |
+        set -euo pipefail
+        if [[ "$CWS_ACTION_ARGS" == *$'\n'* ]]; then
+          echo "args must be a single line" >&2
+          exit 1
+        fi
+
+        [[ -n "$INPUT_CLIENT_ID" ]] && export CWS_CLIENT_ID="$INPUT_CLIENT_ID"
+        [[ -n "$INPUT_CLIENT_SECRET" ]] && export CWS_CLIENT_SECRET="$INPUT_CLIENT_SECRET"
+        [[ -n "$INPUT_REFRESH_TOKEN" ]] && export CWS_REFRESH_TOKEN="$INPUT_REFRESH_TOKEN"
+        [[ -n "$INPUT_PUBLISHER_ID" ]] && export CWS_PUBLISHER_ID="$INPUT_PUBLISHER_ID"
+        [[ -n "$INPUT_EXTENSION_ID" ]] && export CWS_EXTENSION_ID="$INPUT_EXTENSION_ID"
+
+        read -r -a cws_args <<< "$CWS_ACTION_ARGS"
+        if (( ${#cws_args[@]} == 0 )); then
+          echo "args cannot be empty" >&2
+          exit 1
+        fi
+        cws "${cws_args[@]}"

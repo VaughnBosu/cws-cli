@@ -77,7 +77,11 @@ func printPublishWarnings(resp *api.PublishResponse) {
 	if resp == nil || resp.WarningInfo == nil {
 		return
 	}
-	for _, w := range resp.WarningInfo.Warnings {
+	printWarnings(resp.WarningInfo.Warnings)
+}
+
+func printWarnings(warnings []api.Warning) {
+	for _, w := range warnings {
 		if w.Reason != "" {
 			output.Warn("[%s] %s", w.Reason, w.Description)
 		} else {

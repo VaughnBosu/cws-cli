@@ -57,21 +57,37 @@ func TestZipDirectoryWithOptions_IncludeOverridesDefaultExclusion(t *testing.T) 
 	dir := t.TempDir()
 	createFile(t, filepath.Join(dir, "manifest.json"), "{}")
 	createFile(t, filepath.Join(dir, "package.json"), "{}")
+	createFile(t, filepath.Join(dir, "fixture.zip"), "archive")
 
-	data, err := cwszip.ZipDirectoryWithOptions(dir, cwszip.Options{Include: []string{"package.json"}})
+	data, err := cwszip.ZipDirectoryWithOptions(dir, cwszip.Options{Include: []string{"package.json", ".zip"}})
 	if err != nil {
 		t.Fatalf("ZipDirectoryWithOptions error: %v", err)
 	}
 
 	names := zipEntryNames(t, data)
-	found := false
+	found := map[string]bool{}
 	for _, n := range names {
-		if n == "package.json" {
-			found = true
+		found[n] = true
+	}
+	for _, want := range []string{"package.json", "fixture.zip"} {
+		if !found[want] {
+			t.Errorf("zip entries = %v, want %s kept via Include", names, want)
 		}
 	}
-	if !found {
-		t.Errorf("zip entries = %v, want package.json kept via Include", names)
+}
+
+func TestZipDirectory_ExcludesPackageArtifacts(t *testing.T) {
+	dir := t.TempDir()
+	createFile(t, filepath.Join(dir, "manifest.json"), "{}")
+	createFile(t, filepath.Join(dir, "previous.zip"), "archive")
+	createFile(t, filepath.Join(dir, "previous.crx"), "archive")
+
+	data, err := cwszip.ZipDirectory(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if names := zipEntryNames(t, data); len(names) != 1 || names[0] != "manifest.json" {
+		t.Fatalf("zip entries = %v, want only manifest.json", names)
 	}
 }
 

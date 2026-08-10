@@ -23,7 +23,7 @@ main() {
 
     verify_checksum "$tmpdir" "$archive" "$os"
 
-    tar xzf "$tmpdir/$archive" -C "$tmpdir"
+    tar xzf "$tmpdir/$archive" -C "$tmpdir" "$BINARY"
 
     install_dir=$(resolve_install_dir)
     install_binary "$tmpdir/$BINARY" "$install_dir"
@@ -67,7 +67,7 @@ verify_checksum() {
     file="$2"
     os="$3"
 
-    expected=$(grep "$file" "$dir/checksums.txt" | awk '{print $1}')
+    expected=$(awk -v file="$file" '$2 == file { print $1; exit }' "$dir/checksums.txt")
     if [ -z "$expected" ]; then
         printf "Error: checksum not found for %s\n" "$file" >&2
         exit 1
@@ -110,9 +110,8 @@ install_binary() {
 
     if [ ! -w "$dir" ]; then
         printf "Error: %s is not writable\n" "$dir" >&2
-        printf "Re-run with sudo or set CWS_INSTALL_DIR to a writable directory:\n" >&2
-        printf "  sudo sh -c 'curl -fsSL https://vaughnbosu.github.io/cws-cli/install.sh | sh'\n" >&2
-        printf "  curl -fsSL https://vaughnbosu.github.io/cws-cli/install.sh | CWS_INSTALL_DIR=~/.local/bin sh\n" >&2
+        printf "Set CWS_INSTALL_DIR to a writable directory:\n" >&2
+        printf '  curl -fsSL https://vaughnbosu.github.io/cws-cli/install.sh | CWS_INSTALL_DIR="$HOME/.local/bin" sh\n' >&2
         exit 1
     fi
 

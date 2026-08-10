@@ -247,6 +247,8 @@ func TestShouldExclude(t *testing.T) {
 		{"cws.toml", false, true},
 		{"app.js.map", false, true},
 		{"style.css.map", false, true},
+		{"old-package.zip", false, true},
+		{"old-package.crx", false, true},
 		// Should NOT be excluded
 		{"manifest.json", false, false},
 		{"popup.html", false, false},

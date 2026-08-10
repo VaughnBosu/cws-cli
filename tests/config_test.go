@@ -3,6 +3,7 @@ package tests
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -268,6 +269,86 @@ func TestWriteConfig_ProjectOnly(t *testing.T) {
 	}
 	if strings.Contains(content, "[auth]") {
 		t.Error("project-only config should not contain [auth] section")
+	}
+}
+
+func TestWriteConfig_OverwritesExistingFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "cws.toml")
+	if err := os.WriteFile(path, []byte("stale content"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := config.WriteConfig(path, &config.Config{
+		Auth: config.AuthConfig{ClientID: "id", ClientSecret: "secret", RefreshToken: "token"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "stale content") || !strings.Contains(string(data), `refresh_token = "token"`) {
+		t.Fatalf("overwritten config = %q", data)
+	}
+}
+
+func TestWriteConfig_TightensExistingFilePermissions(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows does not expose Unix permission bits")
+	}
+	dir := t.TempDir()
+	path := filepath.Join(dir, "cws.toml")
+	if err := os.WriteFile(path, []byte("old"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(path, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	err := config.WriteConfig(path, &config.Config{
+		Auth: config.AuthConfig{ClientID: "id", ClientSecret: "secret", RefreshToken: "token"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := info.Mode().Perm(); got != 0600 {
+		t.Fatalf("config permissions = %04o, want 0600", got)
+	}
+}
+
+func TestWriteConfig_ReplacesSymlinkWithoutChangingTarget(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "target")
+	path := filepath.Join(dir, "cws.toml")
+	if err := os.WriteFile(target, []byte("leave me alone"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, path); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+
+	if err := config.WriteConfig(path, &config.Config{
+		Auth: config.AuthConfig{ClientID: "id", ClientSecret: "secret", RefreshToken: "token"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	targetData, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(targetData) != "leave me alone" {
+		t.Fatalf("symlink target was overwritten: %q", targetData)
+	}
+	info, err := os.Lstat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		t.Fatal("config path is still a symlink")
 	}
 }
 

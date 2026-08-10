@@ -76,8 +76,8 @@ var publishStatusHints = map[string]string{
 
 // httpStatusHints maps HTTP status codes to actionable hints.
 var httpStatusHints = map[int]string{
-	401: "Your OAuth token is invalid or expired. Run 'cws init' to reconfigure credentials.",
-	403: "Permission denied. Verify your OAuth credentials have access to this extension, or run 'cws init' to reconfigure.",
+	401: "Your OAuth token is invalid or expired. Run 'cws init --global' to reconfigure credentials.",
+	403: "Permission denied. Verify your OAuth credentials have access to this extension, or run 'cws init --global' to reconfigure.",
 	429: "Rate limited by the Chrome Web Store API. Wait a few minutes and try again.",
 }
 

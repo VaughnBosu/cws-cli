@@ -29,6 +29,16 @@ func newTestClient(serverURL string) *api.Client {
 	return client
 }
 
+func assertRequest(t *testing.T, r *http.Request, method, path string) {
+	t.Helper()
+	if r.Method != method {
+		t.Errorf("method = %s, want %s", r.Method, method)
+	}
+	if r.URL.Path != path {
+		t.Errorf("path = %s, want %s", r.URL.Path, path)
+	}
+}
+
 // --- ParseAPIError tests ---
 
 func TestParseAPIError_FieldViolation(t *testing.T) {
@@ -100,6 +110,7 @@ func TestParseAPIError_NullError(t *testing.T) {
 
 func TestFetchStatus_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertRequest(t, r, http.MethodGet, "/v2/publishers/test-publisher/items/ext123:fetchStatus")
 		if r.Header.Get("Authorization") != "Bearer test-token" {
 			t.Errorf("expected Authorization header 'Bearer test-token', got %q", r.Header.Get("Authorization"))
 		}
@@ -191,6 +202,7 @@ func TestFetchStatus_APIError(t *testing.T) {
 
 func TestUpload_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertRequest(t, r, http.MethodPost, "/upload/v2/publishers/test-publisher/items/ext123:upload")
 		body, _ := io.ReadAll(r.Body)
 		if string(body) != "zipdata" {
 			t.Errorf("request body = %q, want %q", string(body), "zipdata")
@@ -263,6 +275,7 @@ func TestUpload_AuthError(t *testing.T) {
 
 func TestPublish_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertRequest(t, r, http.MethodPost, "/v2/publishers/test-publisher/items/ext123:publish")
 		w.WriteHeader(200)
 		json.NewEncoder(w).Encode(map[string]any{
 			"itemId": "ext123",
@@ -390,6 +403,7 @@ func TestPublish_Error(t *testing.T) {
 
 func TestSetDeployPercentage_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertRequest(t, r, http.MethodPost, "/v2/publishers/test-publisher/items/ext123:setPublishedDeployPercentage")
 		body, _ := io.ReadAll(r.Body)
 		var req api.DeployPercentageRequest
 		json.Unmarshal(body, &req)
@@ -433,6 +447,7 @@ func TestSetDeployPercentage_Error(t *testing.T) {
 
 func TestCancelSubmission_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertRequest(t, r, http.MethodPost, "/v2/publishers/test-publisher/items/ext123:cancelSubmission")
 		w.WriteHeader(200)
 		json.NewEncoder(w).Encode(map[string]any{})
 	}))

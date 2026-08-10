@@ -34,6 +34,8 @@ var defaultExclusions = []string{
 // Default file extension exclusions.
 var defaultExtExclusions = []string{
 	".map",
+	".zip",
+	".crx",
 }
 
 // Options controls zip packaging behavior.
@@ -127,10 +129,15 @@ func ZipDirectoryWithOptions(dir string, opts Options) ([]byte, error) {
 		if err != nil {
 			return fmt.Errorf("failed to open %s: %w", relPath, err)
 		}
-		defer file.Close()
-
-		_, err = io.Copy(writer, file)
-		return err
+		_, copyErr := io.Copy(writer, file)
+		closeErr := file.Close()
+		if copyErr != nil {
+			return fmt.Errorf("failed to read %s: %w", relPath, copyErr)
+		}
+		if closeErr != nil {
+			return fmt.Errorf("failed to close %s: %w", relPath, closeErr)
+		}
+		return nil
 	})
 
 	if err != nil {

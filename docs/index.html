@@ -83,8 +83,8 @@
     <div class="mt-8 flex flex-col items-center justify-center gap-3">
       <div class="flex flex-col sm:flex-row items-center justify-center gap-3 w-full sm:w-auto">
         <div class="relative w-full sm:w-auto">
-          <div class="bg-zinc-900 dark:bg-zinc-800 text-zinc-100 rounded-lg px-4 py-3 pr-12 text-sm font-mono text-left whitespace-nowrap overflow-x-auto">brew install vaughnbosu/tap/cws</div>
-          <button data-copy="brew install vaughnbosu/tap/cws" class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded hover:bg-zinc-700 transition text-zinc-400 hover:text-zinc-200" title="Copy">
+          <div class="bg-zinc-900 dark:bg-zinc-800 text-zinc-100 rounded-lg px-4 py-3 pr-12 text-sm font-mono text-left whitespace-nowrap overflow-x-auto">brew install --cask vaughnbosu/tap/cws</div>
+          <button data-copy="brew install --cask vaughnbosu/tap/cws" class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded hover:bg-zinc-700 transition text-zinc-400 hover:text-zinc-200" title="Copy">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" stroke-width="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke-width="2"/></svg>
           </button>
         </div>
@@ -133,12 +133,12 @@
 
       <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-5 hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-sm transition">
         <div class="text-sm font-semibold">V2 API</div>
-        <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">Built on the latest Chrome Web Store API — not the deprecated V1 that other tools still use.</p>
+        <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">Built directly on the current Chrome Web Store API.</p>
       </div>
 
       <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-5 hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-sm transition">
         <div class="text-sm font-semibold">Interactive Setup</div>
-        <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400"><code class="text-xs bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">cws init</code> walks you through OAuth config — no more copy-pasting env vars from docs.</p>
+        <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400"><code class="text-xs bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">cws init --global</code> walks you through OAuth config — no more copy-pasting env vars from docs.</p>
       </div>
 
       <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-5 hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-sm transition">
@@ -174,12 +174,12 @@
             <h3 class="font-semibold">Set up credentials</h3>
           </div>
           <div class="relative">
-            <pre class="bg-zinc-900 dark:bg-zinc-800 text-zinc-100 rounded-lg p-4 text-sm font-mono overflow-x-auto"><code>cws init</code></pre>
-            <button data-copy="cws init" class="absolute right-2 top-2 p-1.5 rounded hover:bg-zinc-700 transition text-zinc-400 hover:text-zinc-200" title="Copy">
+            <pre class="bg-zinc-900 dark:bg-zinc-800 text-zinc-100 rounded-lg p-4 text-sm font-mono overflow-x-auto"><code>cws init --global</code></pre>
+            <button data-copy="cws init --global" class="absolute right-2 top-2 p-1.5 rounded hover:bg-zinc-700 transition text-zinc-400 hover:text-zinc-200" title="Copy">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" stroke-width="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke-width="2"/></svg>
             </button>
           </div>
-          <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">Interactive wizard that configures OAuth2 credentials, refresh token, and Publisher ID. Writes a <code class="text-xs bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">cws.toml</code> config file.</p>
+          <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">Interactive wizard that stores OAuth2 credentials, refresh token, and Publisher ID in your global config.</p>
         </div>
 
         <!-- Step 2 -->
@@ -243,7 +243,7 @@
           </tr>
         </thead>
         <tbody class="divide-y divide-zinc-200 dark:divide-zinc-800">
-          <tr><td class="px-4 py-3 font-mono text-xs"><code>cws init</code></td><td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">Interactive credential setup wizard (browser sign-in)</td></tr>
+          <tr><td class="px-4 py-3 font-mono text-xs"><code>cws init [--global]</code></td><td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">Interactive credential setup wizard (browser sign-in)</td></tr>
           <tr><td class="px-4 py-3 font-mono text-xs"><code>cws login</code></td><td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">Re-acquire a refresh token via browser sign-in</td></tr>
           <tr><td class="px-4 py-3 font-mono text-xs"><code>cws validate [source]</code></td><td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">Pre-flight validation (manifest, version, icons, size, policy flags)</td></tr>
           <tr><td class="px-4 py-3 font-mono text-xs"><code>cws pack [source]</code></td><td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">Zip an extension directory without uploading</td></tr>
@@ -376,12 +376,12 @@ cws cancel -e abcdefghijklmnopabcdefghijklmnop</code></pre>
           <svg class="w-4 h-4 text-zinc-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
         </summary>
         <div class="px-5 pb-5">
-          <pre class="bg-zinc-900 dark:bg-zinc-800 text-zinc-100 rounded-lg p-4 text-sm font-mono overflow-x-auto"><code><span class="text-zinc-500"># Set up credentials in current directory</span>
-cws init
+          <pre class="bg-zinc-900 dark:bg-zinc-800 text-zinc-100 rounded-lg p-4 text-sm font-mono overflow-x-auto"><code><span class="text-zinc-500"># Recommended: keep credentials outside the project</span>
+cws init --global
 
-<span class="text-zinc-500"># Save credentials globally (~/.config/cws/cws.toml)</span>
-cws init --global</code></pre>
-          <p class="mt-3 text-xs text-zinc-500 dark:text-zinc-400">Interactive wizard that guides you through configuring OAuth2 Client ID, Client Secret, Refresh Token, and Publisher ID. Secrets are read without echoing, the refresh token can be acquired with a browser sign-in (no OAuth Playground needed), credentials are validated before saving, and <code>cws.toml</code> is added to <code>.gitignore</code> automatically. Use <code>cws login</code> later to refresh an expired token.</p>
+<span class="text-zinc-500"># Optional: write a local config containing credentials</span>
+cws init</code></pre>
+          <p class="mt-3 text-xs text-zinc-500 dark:text-zinc-400">Interactive wizard that guides you through configuring OAuth2 Client ID, Client Secret, Refresh Token, and Publisher ID. Secrets are read without echoing, credentials are validated before saving, and a local <code>cws.toml</code> is added to <code>.gitignore</code>. Use <code>cws login</code> later to refresh an expired token.</p>
         </div>
       </details>
 
@@ -413,25 +413,13 @@ cws init --global</code></pre>
       <!-- Config file -->
       <div>
         <h3 class="font-semibold mb-3">Config file</h3>
-        <p class="text-sm text-zinc-500 dark:text-zinc-400 mb-3"><code class="text-xs bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">cws init</code> writes credentials to <code class="text-xs bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">./cws.toml</code>. <strong class="text-zinc-700 dark:text-zinc-300">This file contains secrets — do not commit it.</strong></p>
+        <p class="text-sm text-zinc-500 dark:text-zinc-400 mb-3"><code class="text-xs bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">cws init --global</code> writes credentials to <code class="text-xs bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">~/.config/cws/cws.toml</code>. Keep only extension and packaging settings in the project:</p>
         <div class="relative">
-          <pre class="bg-zinc-900 dark:bg-zinc-800 text-zinc-100 rounded-lg p-4 text-sm font-mono overflow-x-auto"><code>publisher_id = "abc1234567890"
-
-[auth]
-client_id = "xxxxxxxxxxxx.apps.googleusercontent.com"
-client_secret = "GOCSPX-xxxxxxxxxxxx"
-refresh_token = "1//xxxxxxxxxxxx"
-
-[extensions.default]
-id = "abcdefghijklmnopabcdefghijklmnop"
-source = "./dist"</code></pre>
-        </div>
-        <p class="mt-3 text-sm text-zinc-500 dark:text-zinc-400">Use <code class="text-xs bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">cws init --global</code> to write credentials to <code class="text-xs bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">~/.config/cws/cws.toml</code> instead, keeping secrets out of your project. Then create a minimal per-project config (safe to commit):</p>
-        <div class="relative mt-3">
           <pre class="bg-zinc-900 dark:bg-zinc-800 text-zinc-100 rounded-lg p-4 text-sm font-mono overflow-x-auto"><code>[extensions.default]
 id = "abcdefghijklmnopabcdefghijklmnop"
 source = "./dist"</code></pre>
         </div>
+        <p class="mt-3 text-sm text-zinc-500 dark:text-zinc-400">Running <code class="text-xs bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">cws init</code> without <code class="text-xs bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">--global</code> writes credentials to <code class="text-xs bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">./cws.toml</code>. That file contains secrets and must not be committed.</p>
       </div>
 
       <!-- Env vars -->
@@ -478,8 +466,9 @@ source = "./dist"</code></pre>
     <div class="relative">
       <pre class="bg-zinc-900 dark:bg-zinc-800 text-zinc-100 rounded-lg p-4 text-sm font-mono overflow-x-auto"><code><span class="text-zinc-500"># .github/workflows/publish.yml</span>
 - name: Upload and publish extension
-  uses: vaughnbosu/cws-cli@main
+  uses: vaughnbosu/cws-cli@v1.3.1
   with:
+    version: v1.3.1
     args: upload ./dist --publish
     client-id: ${{ secrets.CWS_CLIENT_ID }}
     client-secret: ${{ secrets.CWS_CLIENT_SECRET }}
@@ -487,6 +476,7 @@ source = "./dist"</code></pre>
     publisher-id: ${{ secrets.CWS_PUBLISHER_ID }}
     extension-id: ${{ vars.EXTENSION_ID }}</code></pre>
     </div>
+    <p class="mt-3 text-sm text-zinc-500 dark:text-zinc-400">The Action supports Linux and macOS runners on amd64 or arm64. Standalone Windows binaries are available from GitHub Releases.</p>
 
     <h3 class="font-semibold mb-3 mt-10">Any other CI</h3>
     <div class="relative">
@@ -503,63 +493,6 @@ source = "./dist"</code></pre>
     </div>
   </section>
 
-  <!-- Comparison -->
-  <section class="border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
-    <div class="max-w-4xl mx-auto px-4 sm:px-6 py-20">
-      <h2 class="text-2xl sm:text-3xl font-bold text-center">cws vs chrome-webstore-upload-cli</h2>
-      <p class="mt-3 text-center text-zinc-500 dark:text-zinc-400 mb-12">The go-to tool has been <a href="https://github.com/fregante/chrome-webstore-upload-cli" target="_blank" rel="noopener" class="underline hover:text-zinc-900 dark:hover:text-zinc-100 transition">chrome-webstore-upload-cli</a>. Here's how they compare.</p>
-
-      <div class="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
-              <th class="text-left px-4 py-3 font-semibold"></th>
-              <th class="text-left px-4 py-3 font-semibold">cws</th>
-              <th class="text-left px-4 py-3 font-semibold">chrome-webstore-upload-cli</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-zinc-200 dark:divide-zinc-800">
-            <tr>
-              <td class="px-4 py-3 font-semibold">Runtime</td>
-              <td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">Single binary — no dependencies</td>
-              <td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">Requires Node.js + npm</td>
-            </tr>
-            <tr>
-              <td class="px-4 py-3 font-semibold">API</td>
-              <td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">V2</td>
-              <td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">V1</td>
-            </tr>
-            <tr>
-              <td class="px-4 py-3 font-semibold">Setup</td>
-              <td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">Interactive wizard</td>
-              <td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">Manual env var config</td>
-            </tr>
-            <tr>
-              <td class="px-4 py-3 font-semibold">Commands</td>
-              <td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">validate, pack, upload, publish, status, rollout, cancel, login</td>
-              <td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">upload, publish</td>
-            </tr>
-            <tr>
-              <td class="px-4 py-3 font-semibold">Config</td>
-              <td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">TOML + env vars + CLI flags</td>
-              <td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">Env vars only</td>
-            </tr>
-            <tr>
-              <td class="px-4 py-3 font-semibold">Pre-upload validation</td>
-              <td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">Built-in — manifest, version, size checks before upload</td>
-              <td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">None</td>
-            </tr>
-            <tr>
-              <td class="px-4 py-3 font-semibold">CI/CD</td>
-              <td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">Drop in a binary</td>
-              <td class="px-4 py-3 text-zinc-500 dark:text-zinc-400">Requires Node.js in CI image</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-
   <!-- Installation -->
   <section class="border-t border-zinc-200 dark:border-zinc-800">
     <div class="max-w-3xl mx-auto px-4 sm:px-6 py-20">
@@ -571,8 +504,8 @@ source = "./dist"</code></pre>
         <div>
           <h3 class="font-semibold mb-3">Homebrew (macOS & Linux)</h3>
           <div class="relative">
-            <pre class="bg-zinc-900 dark:bg-zinc-800 text-zinc-100 rounded-lg p-4 text-sm font-mono overflow-x-auto"><code>brew install vaughnbosu/tap/cws</code></pre>
-            <button data-copy="brew install vaughnbosu/tap/cws" class="absolute right-2 top-2 p-1.5 rounded hover:bg-zinc-700 transition text-zinc-400 hover:text-zinc-200" title="Copy">
+            <pre class="bg-zinc-900 dark:bg-zinc-800 text-zinc-100 rounded-lg p-4 text-sm font-mono overflow-x-auto"><code>brew install --cask vaughnbosu/tap/cws</code></pre>
+            <button data-copy="brew install --cask vaughnbosu/tap/cws" class="absolute right-2 top-2 p-1.5 rounded hover:bg-zinc-700 transition text-zinc-400 hover:text-zinc-200" title="Copy">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" stroke-width="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke-width="2"/></svg>
             </button>
           </div>

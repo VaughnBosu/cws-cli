@@ -84,16 +84,15 @@ func runValidationChecks(ctx context.Context, actx *Context, cfg *config.Config,
 		}
 		results = append(results, validationPass("manifest.json found"))
 
-		m, err = manifest.Parse(manifestPath)
-		if err != nil {
-			return append(results, validationFail("manifest.json: %s", err)), nil
-		}
-		results = append(results, validationPass("manifest.json is valid JSON"))
-
 		zipData, err = cwszip.ZipDirectoryWithOptions(absSource, zipOptions(pkg))
 		if err != nil {
 			return append(results, validationFail("Failed to zip directory: %s", err)), nil
 		}
+		m, err = manifest.ParseFromZip(zipData)
+		if err != nil {
+			return append(results, validationFail("Packaged manifest.json: %s", err)), nil
+		}
+		results = append(results, validationPass("manifest.json is valid JSON"))
 	} else {
 		ext := strings.ToLower(filepath.Ext(absSource))
 		if ext != ".zip" && ext != ".crx" {
@@ -138,7 +137,7 @@ func runValidationChecks(ctx context.Context, actx *Context, cfg *config.Config,
 		}
 
 		if len(m.Icons) > 0 {
-			missingIcons := missingIconFiles(m, info.IsDir(), absSource, zipData)
+			missingIcons := missingIconFiles(m, zipData)
 			if len(missingIcons) > 0 {
 				results = append(results, validationFail("Missing icon files: %s", strings.Join(missingIcons, ", ")))
 			} else {
@@ -223,19 +222,12 @@ func runValidationChecks(ctx context.Context, actx *Context, cfg *config.Config,
 	return results, zipData
 }
 
-func missingIconFiles(m *manifest.Manifest, isDir bool, absSource string, zipData []byte) []string {
+func missingIconFiles(m *manifest.Manifest, zipData []byte) []string {
 	var missing []string
 	for _, iconPath := range m.Icons {
-		clean := strings.TrimPrefix(iconPath, "/")
-		if isDir {
-			if _, err := os.Stat(filepath.Join(absSource, filepath.FromSlash(clean))); err != nil {
-				missing = append(missing, iconPath)
-			}
-		} else if zipData != nil {
-			found, err := cwszip.ContainsFileInZip(zipData, clean)
-			if err != nil || !found {
-				missing = append(missing, iconPath)
-			}
+		found, err := cwszip.ContainsFileInZip(zipData, iconPath)
+		if err != nil || !found {
+			missing = append(missing, iconPath)
 		}
 	}
 	return missing

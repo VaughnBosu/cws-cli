@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/viper"
+	"github.com/vaughnbosu/cws-cli/internal/privatefile"
 )
 
 // Config holds all configuration for the CLI.
@@ -158,16 +159,16 @@ func ResolveSource(argValue, extName string, cfg *Config) string {
 // ValidateAuth checks that all required auth fields are present.
 func ValidateAuth(cfg *Config) error {
 	if cfg.Auth.ClientID == "" {
-		return fmt.Errorf("no configuration found. Run 'cws init' to set up credentials, or set CWS_* environment variables")
+		return fmt.Errorf("no configuration found. Run 'cws init --global' to set up credentials, or set CWS_* environment variables")
 	}
 	if cfg.Auth.ClientSecret == "" {
-		return fmt.Errorf("client secret not configured. Run 'cws init' to set up credentials, or set CWS_CLIENT_SECRET")
+		return fmt.Errorf("client secret not configured. Run 'cws init --global' to set up credentials, or set CWS_CLIENT_SECRET")
 	}
 	if cfg.Auth.RefreshToken == "" {
-		return fmt.Errorf("refresh token not configured. Run 'cws init' to set up credentials, or set CWS_REFRESH_TOKEN")
+		return fmt.Errorf("refresh token not configured. Run 'cws init --global' to set up credentials, or set CWS_REFRESH_TOKEN")
 	}
 	if cfg.PublisherID == "" {
-		return fmt.Errorf("publisher ID not configured. Run 'cws init' to set up credentials, or set CWS_PUBLISHER_ID")
+		return fmt.Errorf("publisher ID not configured. Run 'cws init --global' to set up credentials, or set CWS_PUBLISHER_ID")
 	}
 	return nil
 }
@@ -213,7 +214,7 @@ id = %q
 		}
 	}
 
-	if err := os.WriteFile(path, []byte(content), 0600); err != nil {
+	if err := privatefile.Write(path, []byte(content)); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 	return nil

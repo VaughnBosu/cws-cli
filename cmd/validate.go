@@ -33,7 +33,7 @@ func runValidate(cmd *cobra.Command, args []string) error {
 	localOnly, _ := cmd.Flags().GetBool("local")
 
 	cfg, err := config.Load()
-	if err != nil && !localOnly {
+	if err != nil {
 		return err
 	}
 

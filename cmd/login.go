@@ -8,9 +8,10 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/vaughnbosu/cws-cli/internal/output"
+	"github.com/vaughnbosu/cws-cli/internal/privatefile"
 	"github.com/vaughnbosu/cws-cli/pkg/auth"
 	"github.com/vaughnbosu/cws-cli/pkg/config"
-	"github.com/vaughnbosu/cws-cli/internal/output"
 )
 
 var loginCmd = &cobra.Command{
@@ -19,7 +20,7 @@ var loginCmd = &cobra.Command{
 	Long: `Sign in with your browser to obtain a fresh OAuth refresh token.
 
 Uses the client ID and secret from your existing configuration (run
-'cws init' first if you have none) and updates the config file in place.`,
+'cws init --global' first if you have none) and updates the config file in place.`,
 	RunE: runLogin,
 }
 
@@ -33,7 +34,7 @@ func runLogin(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if cfg.Auth.ClientID == "" || cfg.Auth.ClientSecret == "" {
-		return fmt.Errorf("no OAuth client configured. Run 'cws init' to set up credentials first")
+		return fmt.Errorf("no OAuth client configured. Run 'cws init --global' to set up credentials first")
 	}
 
 	refreshToken, err := auth.AcquireRefreshToken(context.Background(), cfg.Auth.ClientID, cfg.Auth.ClientSecret)
@@ -84,7 +85,7 @@ func SaveRefreshToken(path, token string, cfg *config.Config) error {
 		content += "\n[auth]\n" + line + "\n"
 	}
 
-	return os.WriteFile(path, []byte(content), 0600)
+	return privatefile.Write(path, []byte(content))
 }
 
 var tokenLineRe = regexp.MustCompile(`(?m)^[ \t]*refresh_token[ \t]*=.*$`)
