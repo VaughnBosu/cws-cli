@@ -45,17 +45,18 @@ homebrew_casks:
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
     directory: Casks
-    url:
-      verified: github.com/vaughnbosu/cws-cli/
     homepage: "https://vaughnbosu.github.io/cws-cli/"
     description: "A CLI for managing Chrome Web Store extensions"
     license: "MIT"
-    hooks:
-      post:
-        install: |
-          if OS.mac?
-            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/cws"]
-          end
+    # Homebrew 7 deprecated `postflight` for `postflight_steps`, which
+    # hooks.post.install can't emit yet (goreleaser/goreleaser#6870).
+    # {{staged_path}} is Homebrew's token, escaped from GoReleaser's templating.
+    custom_block: |
+      postflight_steps do
+        on_macos do
+          run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ "{{staged_path}}" }}/cws"]
+        end
+      end
 
 release:
   github:
